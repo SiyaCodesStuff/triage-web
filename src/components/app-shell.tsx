@@ -1,9 +1,11 @@
-import { useEffect, useRef } from 'react';
-import { Link, NavLink, Outlet, useLocation } from 'react-router';
+import { useState, useEffect, useRef } from 'react';
+import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router';
 import { LifeBuoy } from 'lucide-react';
+import { useAuth } from '@/auth/context';
+import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
-const links = [
+const guestLinks = [
   { to: '/tickets', label: 'Tickets' },
   { to: '/admin/users', label: 'Users' },
   { to: '/login', label: 'Log in' },
@@ -12,6 +14,26 @@ const links = [
 
 export function AppShell() {
   const { pathname } = useLocation();
+  const { user, logout, isLoggingOut } = useAuth();
+  const navigate = useNavigate();
+  const [logoutError, setLogoutError] = useState('');
+  const links = user
+    ? [
+        { to: '/tickets', label: 'Tickets' },
+        ...(user.role === 'ADMIN'
+          ? [{ to: '/admin/users', label: 'Users' }]
+          : []),
+      ]
+    : guestLinks.filter((link) => link.to !== '/admin/users');
+  async function handleLogout() {
+    setLogoutError('');
+    try {
+      await logout();
+      navigate('/login', { replace: true });
+    } catch {
+      setLogoutError('Unable to log out. Please try again.');
+    }
+  }
   const mainRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
@@ -52,6 +74,17 @@ export function AppShell() {
                 {label}
               </NavLink>
             ))}
+            {user && (
+              <Button
+                variant="outline"
+                disabled={isLoggingOut}
+                onClick={() => {
+                  void handleLogout();
+                }}
+              >
+                {isLoggingOut ? 'Logging out…' : 'Log out'}
+              </Button>
+            )}
           </nav>
         </div>
       </header>
@@ -61,6 +94,11 @@ export function AppShell() {
         tabIndex={-1}
         className="mx-auto w-full max-w-6xl flex-1 px-4 py-10 focus:outline-none sm:px-6 sm:py-14"
       >
+        {logoutError && (
+          <p role="alert" className="mb-4 text-destructive">
+            {logoutError}
+          </p>
+        )}
         <Outlet />
       </main>
       <footer className="border-t">

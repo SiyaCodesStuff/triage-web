@@ -33,6 +33,7 @@ type Field<K extends string, Value, Required extends boolean> = [
     : { [Key in K]?: Value };
 
 export type ApiRequestOptions<P extends keyof paths, M extends ApiMethod> = {
+  auth?: 'required' | 'optional';
   headers?: HeadersInit;
   signal?: AbortSignal;
 } & Field<'params', Parameter<P, M, 'path'>, true> &

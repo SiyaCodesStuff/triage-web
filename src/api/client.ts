@@ -6,6 +6,7 @@ import type {
   ApiResponse,
 } from '@/api/types';
 import { ApiError } from '@/api/error';
+import { redirectToLogin as defaultRedirectToLogin } from '@/auth/redirect';
 import { clearAuthState, setAuthUser } from '@/auth/session';
 
 export { ApiError } from '@/api/error';
@@ -15,6 +16,7 @@ type ClientOptions = {
   redirectToLogin?: () => void;
 };
 type RuntimeOptions = {
+  auth?: 'required' | 'optional';
   params?: object;
   query?: object;
   body?: unknown;
@@ -68,7 +70,7 @@ async function readResponse<T>(response: Response): Promise<T> {
 
 export function createApiClient({
   basePath = import.meta.env.VITE_API_BASE_PATH || '/api/v1',
-  redirectToLogin = () => window.location.assign('/login'),
+  redirectToLogin = defaultRedirectToLogin,
 }: ClientOptions = {}) {
   if (!/^\/(?:[A-Za-z0-9_-]+\/)*[A-Za-z0-9_-]+$/.test(basePath)) {
     throw new Error(
@@ -81,11 +83,16 @@ export function createApiClient({
   let authVersion = 0;
   let expired = false;
 
-  function expireSession() {
-    if (expired) return;
-    expired = true;
-    clearAuthState();
-    redirectToLogin();
+  let redirected = false;
+  function expireSession(redirect: boolean) {
+    if (!expired) {
+      expired = true;
+      clearAuthState();
+    }
+    if (redirect && !redirected) {
+      redirected = true;
+      redirectToLogin();
+    }
   }
 
   function send(method: ApiMethod, path: string, options: RuntimeOptions = {}) {
@@ -122,9 +129,6 @@ export function createApiClient({
           setAuthUser(result.data);
           authVersion += 1;
           return result;
-        } catch (error) {
-          expireSession();
-          throw error;
         } finally {
           refreshPromise = undefined;
         }
@@ -143,11 +147,23 @@ export function createApiClient({
 
     // Explicit refresh calls join automatic rotations too; they never recurse.
     if (path === '/auth/refresh' && method === 'post') {
-      return (await refreshSession()) as ApiResponse<P, M>;
+      try {
+        return (await refreshSession()) as ApiResponse<P, M>;
+      } catch (error) {
+        expireSession(options.auth !== 'optional');
+        throw error;
+      }
     }
 
     const canRefresh = !authPaths.has(path);
-    if (canRefresh && refreshPromise) await refreshPromise;
+    if (canRefresh && refreshPromise) {
+      try {
+        await refreshPromise;
+      } catch (error) {
+        expireSession(options.auth !== 'optional');
+        throw error;
+      }
+    }
     options.signal?.throwIfAborted();
     const version = authVersion;
     let resolvedPath: string = path;
@@ -161,17 +177,27 @@ export function createApiClient({
     if (response.status === 401 && canRefresh && !expired) {
       options.signal?.throwIfAborted();
       // A late 401 for an older cookie should reuse the already completed rotation.
-      if (version === authVersion) await refreshSession();
+      if (version === authVersion) {
+        try {
+          await refreshSession();
+        } catch (error) {
+          expireSession(options.auth !== 'optional');
+          throw error;
+        }
+      }
       options.signal?.throwIfAborted();
       response = await send(method, resolvedPath, options);
-      if (response.status === 401) expireSession();
     }
+    if (response.status === 401 && canRefresh)
+      expireSession(options.auth !== 'optional');
     const result = await readResponse<ApiResponse<P, M>>(response);
     if (
       method === 'post' &&
       (path === '/auth/login' || path === '/auth/register')
     ) {
+      clearAuthState();
       expired = false;
+      redirected = false;
       authVersion += 1;
       setAuthUser((result as components['schemas']['UserResponse']).data);
     } else if (method === 'post' && path === '/auth/logout') {

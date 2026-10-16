@@ -10,5 +10,14 @@ export function setAuthUser(user: AuthUser) {
 
 export function clearAuthState() {
   // Private cached data must not survive session expiry or logout.
-  queryClient.clear();
+  void queryClient.cancelQueries({ queryKey: authUserKey, exact: true });
+  queryClient.removeQueries({
+    predicate: (query) =>
+      !(
+        query.queryKey.length === 2 &&
+        query.queryKey[0] === 'auth' &&
+        query.queryKey[1] === 'user'
+      ),
+  });
+  queryClient.setQueryData<AuthUser | null>(authUserKey, null);
 }
