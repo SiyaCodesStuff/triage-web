@@ -26,6 +26,14 @@ beforeAll(() => server.listen({ onUnhandledFrame: 'error' }));
 beforeEach(() => {
   queryClient.clear();
   server.use(
+    http.get(`${base}/tickets`, () =>
+      HttpResponse.json({
+        data: [],
+        meta: { page: 1, pageSize: 20, total: 0, totalPages: 0 },
+      }),
+    ),
+  );
+  server.use(
     http.get(`${base}/users/me`, unauthorized),
     http.post(`${base}/auth/refresh`, unauthorized),
   );

@@ -4,6 +4,7 @@ import { ProtectedRoute, RoleRoute } from '@/auth/protected-route';
 import { AuthPage } from '@/pages/auth-page';
 import { NotFoundPage } from '@/pages/not-found-page';
 import { PlaceholderPage } from '@/pages/placeholder-page';
+import { TicketsPage } from '@/pages/tickets-page';
 import { TicketPage } from '@/pages/ticket-page';
 
 export default function App() {
@@ -17,15 +18,7 @@ export default function App() {
           element={<AuthPage key="register" mode="register" />}
         />
         <Route element={<ProtectedRoute />}>
-          <Route
-            path="tickets"
-            element={
-              <PlaceholderPage
-                title="Tickets"
-                description="Keep track of support requests and what needs attention."
-              />
-            }
-          />
+          <Route path="tickets" element={<TicketsPage />} />
           <Route path="tickets/:id" element={<TicketPage />} />
           <Route element={<RoleRoute roles={['ADMIN']} />}>
             <Route
