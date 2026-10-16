@@ -147,3 +147,13 @@ Successful mutations invalidate ticket lists and the affected ticket detail;
 deleted detail data is removed. Errors appear inline and in toasts. Conflict
 errors preserve form input and offer a reload, while missing tickets show a
 friendly message with retry and a link back to tickets.
+
+## Comment threads
+
+Ticket details include comments in the API's oldest-first order, paginated with
+`page` and `limit=50`. Comments are trimmed and limited to 4,000 characters.
+CLOSED tickets disable the composer with an explanation; a server-side 409 keeps
+the draft, displays inline/toast feedback, and refreshes the ticket status.
+Authors and ADMINs can delete comments, including on closed tickets; AGENTs have
+no deletion override. Comment mutations invalidate all pages of the ticket's
+thread, and deleting a ticket also removes its cached comments.
