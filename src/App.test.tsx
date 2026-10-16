@@ -11,13 +11,18 @@ import {
 } from 'vitest';
 import { renderAuthApp } from '@/test/auth-app';
 import { server } from '@/test/server';
-import { user } from '@/test/fixtures';
+import { ticket, user } from '@/test/fixtures';
 import { queryClient } from '@/lib/query-client';
 
 const base = `${window.location.origin}/api/v1`;
 beforeAll(() => server.listen({ onUnhandledFrame: 'error' }));
 beforeEach(() => {
   queryClient.clear();
+  server.use(
+    http.get(`${base}/tickets/:id`, ({ params }) =>
+      HttpResponse.json({ data: { ...ticket, id: String(params.id) } }),
+    ),
+  );
   server.use(
     http.get(`${base}/tickets`, () =>
       HttpResponse.json({
@@ -44,7 +49,7 @@ describe('Application routes', () => {
     ['/login', 'Log in'],
     ['/register', 'Create an account'],
     ['/tickets', 'Tickets'],
-    ['/tickets/abc-123', 'Ticket abc-123'],
+    ['/tickets/abc-123', 'Printer issue'],
     ['/admin/users', 'Users'],
   ])('renders %s', async (path, title) => {
     renderAuthApp(path);

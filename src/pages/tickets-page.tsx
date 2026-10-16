@@ -67,6 +67,9 @@ export function TicketsPage() {
           Keep track of support requests and what needs attention.
         </p>
       </div>
+      <Button asChild>
+        <Link to="/tickets/new">Create ticket</Link>
+      </Button>
       <form
         key={canonical}
         aria-label="Ticket filters"
