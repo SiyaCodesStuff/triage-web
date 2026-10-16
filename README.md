@@ -38,3 +38,20 @@ npm run format
 
 Vitest uses jsdom and Testing Library. `@/` resolves to `src/` in TypeScript,
 Vite, and tests. The application and configuration use strict TypeScript.
+
+## Application shell
+
+Routes: `/login`, `/register`, `/tickets`, `/tickets/:id`, and `/admin/users`.
+The root redirects to `/tickets`; unmatched paths show a 404 page. These are
+placeholders; authentication and authorization are not implemented yet.
+
+The responsive shell includes main navigation, a skip link, and focus management
+on route changes. The theme follows the operating system, including live changes.
+Tailwind CSS uses the Vite plugin. shadcn/ui configuration is in `components.json`;
+Button, Card, and Sonner components live in `src/components/ui`.
+
+Use `toast.success('Saved')` or `toast.error('Could not save')` from `sonner`
+for notifications. A shared toaster follows the app theme and supports dismissal.
+The top-level error boundary provides reload and return-to-tickets actions.
+Production hosting must serve `index.html` for frontend routes to support direct
+links and refreshes with BrowserRouter.
