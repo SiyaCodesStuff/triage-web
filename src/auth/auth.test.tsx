@@ -14,7 +14,7 @@ import { queryClient } from '@/lib/query-client';
 import { authUserKey } from '@/auth/session';
 import { renderAuthApp } from '@/test/auth-app';
 import { server } from '@/test/server';
-import { user } from '@/test/fixtures';
+import { ticket, user } from '@/test/fixtures';
 
 const base = `${window.location.origin}/api/v1`;
 const unauthorized = () =>
@@ -25,6 +25,11 @@ const unauthorized = () =>
 beforeAll(() => server.listen({ onUnhandledFrame: 'error' }));
 beforeEach(() => {
   queryClient.clear();
+  server.use(
+    http.get(`${base}/tickets/:id`, ({ params }) =>
+      HttpResponse.json({ data: { ...ticket, id: String(params.id) } }),
+    ),
+  );
   server.use(
     http.get(`${base}/tickets`, () =>
       HttpResponse.json({
@@ -73,7 +78,7 @@ describe('Authentication', () => {
     await screen.findByRole('heading', { name: 'Log in' });
     fireEvent.click(await fillLogin());
     expect(
-      await screen.findByRole('heading', { name: 'Ticket abc-123' }),
+      await screen.findByRole('heading', { name: 'Printer issue' }),
     ).toBeVisible();
     expect(screen.getByLabelText('Current location')).toHaveTextContent(
       '/tickets/abc-123?tab=conversation#latest',

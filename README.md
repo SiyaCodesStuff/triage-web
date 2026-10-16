@@ -42,7 +42,7 @@ Vite, and tests. The application and configuration use strict TypeScript.
 ## Application shell
 
 Routes: `/login`, `/register`, `/tickets`, `/tickets/:id`, and `/admin/users`.
-The root redirects to `/tickets`; unmatched paths show a 404 page. Ticket details and user management pages remain placeholders. Login and registration are
+The root redirects to `/tickets`; unmatched paths show a 404 page. User management remains a placeholder. Login and registration are
 implemented, and private routes require an authenticated session.
 
 The responsive shell includes main navigation, a skip link, and focus management
@@ -132,3 +132,18 @@ filters. Previous results remain visible while changing pages, with an updating
 message and disabled paging controls until the requested page arrives.
 
 Vitest uses at most two workers to avoid jsdom memory and CPU contention in WSL.
+
+## Ticket details and changes
+
+`/tickets/:id` displays ticket details; `/tickets/new` creates a ticket and
+`/tickets/:id/edit` edits it. USERs may edit only their own OPEN tickets, and only
+title/description. Staff can also update priority, assign an AGENT/ADMIN UUID or
+clear assignment, and choose only valid next statuses:
+OPEN → IN_PROGRESS → RESOLVED → CLOSED, plus RESOLVED → OPEN.
+Keeping the current status omits it from the PATCH. Only ADMINs see deletion,
+which requires confirmation in a keyboard-accessible dialog.
+
+Successful mutations invalidate ticket lists and the affected ticket detail;
+deleted detail data is removed. Errors appear inline and in toasts. Conflict
+errors preserve form input and offer a reload, while missing tickets show a
+friendly message with retry and a link back to tickets.

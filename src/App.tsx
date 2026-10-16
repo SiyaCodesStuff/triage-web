@@ -5,6 +5,7 @@ import { AuthPage } from '@/pages/auth-page';
 import { NotFoundPage } from '@/pages/not-found-page';
 import { PlaceholderPage } from '@/pages/placeholder-page';
 import { TicketsPage } from '@/pages/tickets-page';
+import { CreateTicketPage, EditTicketPage } from '@/pages/ticket-form-page';
 import { TicketPage } from '@/pages/ticket-page';
 
 export default function App() {
@@ -19,6 +20,8 @@ export default function App() {
         />
         <Route element={<ProtectedRoute />}>
           <Route path="tickets" element={<TicketsPage />} />
+          <Route path="tickets/new" element={<CreateTicketPage />} />
+          <Route path="tickets/:id/edit" element={<EditTicketPage />} />
           <Route path="tickets/:id" element={<TicketPage />} />
           <Route element={<RoleRoute roles={['ADMIN']} />}>
             <Route
