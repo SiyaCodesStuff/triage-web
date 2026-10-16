@@ -23,6 +23,11 @@ let role: components['schemas']['User']['role'];
 beforeAll(() => server.listen({ onUnhandledFrame: 'error' }));
 beforeEach(() => {
   queryClient.clear();
+  server.use(
+    http.get(`${base}/tickets/:id/comments`, () =>
+      HttpResponse.json({ data: { data: [], page: 1, limit: 50, total: 0 } }),
+    ),
+  );
   record = { ...ticket };
   role = 'USER';
   server.use(

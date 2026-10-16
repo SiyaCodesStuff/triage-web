@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { api } from '@/api/client';
 import { useAuth } from '@/auth/context';
 import { useTicket, canEditTicket } from '@/features/tickets/detail';
+import { CommentThread } from '@/features/tickets/comment-thread';
 import { displayEnum } from '@/features/tickets/search';
 import { TicketError, ticketErrorMessage } from '@/components/ticket-error';
 import { Button } from '@/components/ui/button';
@@ -27,6 +28,7 @@ export function TicketPage() {
       toast.success('Ticket deleted.');
       navigate('/tickets', { replace: true });
       cache.removeQueries({ queryKey: ['ticket', id] });
+      cache.removeQueries({ queryKey: ['comments', id] });
     },
     onError: (error) => {
       toast.error(ticketErrorMessage(error));
@@ -147,6 +149,7 @@ export function TicketPage() {
           You can edit only your own open tickets.
         </p>
       )}
+      <CommentThread key={data.id} ticket={data} />
     </section>
   );
 }
