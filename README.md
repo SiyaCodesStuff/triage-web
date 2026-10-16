@@ -42,8 +42,8 @@ Vite, and tests. The application and configuration use strict TypeScript.
 ## Application shell
 
 Routes: `/login`, `/register`, `/tickets`, `/tickets/:id`, and `/admin/users`.
-The root redirects to `/tickets`; unmatched paths show a 404 page. These are
-placeholders; authentication forms and route authorization are not implemented yet.
+The root redirects to `/tickets`; unmatched paths show a 404 page. Ticket and user management pages remain placeholders. Login and registration are
+implemented, and private routes require an authenticated session.
 
 The responsive shell includes main navigation, a skip link, and focus management
 on route changes. The theme follows the operating system, including live changes.
@@ -99,3 +99,24 @@ at most twice. They do not retry 4xx errors or cancellations. Mutations do not
 retry automatically. `authUserKey` in `src/auth/session.ts` holds the public user
 cached by login, registration, and refresh. API tests use MSW in Node; no service
 worker or real API is needed to run the test suite.
+
+## Authentication
+
+`AuthProvider` loads the current public user through `GET /api/v1/users/me`
+and TanStack Query. Its optional session probe can refresh an expired access
+cookie without redirecting anonymous visitors away from public auth pages.
+`useAuth()` exposes the user, loading/error state, login, registration, and logout.
+Signed-out state is cached as `null`; private data is removed on logout or expiry.
+No authentication tokens are stored in localStorage or sessionStorage.
+
+Both forms use React Hook Form and Zod, labelled inputs, pending/disabled states,
+and field-level API validation details. Registration also maps email conflicts
+to the email input. The requested frontend password minimum is 10 characters for
+both forms (maximum 128). The API itself permits 1–128 characters at login and
+requires 10–128 at registration. Name and email limits match the API.
+
+`ProtectedRoute` guards tickets; `RoleRoute` restricts `/admin/users` to ADMIN.
+The API remains responsible for enforcing authorization. Guards preserve the
+path, query, and hash in router state; expiry redirects use a local `returnTo`
+query parameter. Login and registration return to that destination, defaulting
+to `/tickets`; external destinations and auth-page loops are rejected.

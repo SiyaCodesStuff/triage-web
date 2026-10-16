@@ -156,7 +156,8 @@ describe('API client', () => {
     );
     const { api } = client();
     await expect(api.request('post', '/auth/logout')).resolves.toBeUndefined();
-    expect(queryClient.getQueryCache().getAll()).toHaveLength(0);
+    expect(queryClient.getQueryData(authUserKey)).toBeNull();
+    expect(queryClient.getQueryData(['tickets'])).toBeUndefined();
   });
 
   it('refreshes once with CSRF then replays the original method, body, and headers', async () => {
@@ -301,7 +302,8 @@ describe('API client', () => {
       expect(refreshes).toBe(1);
       expect(attempts).toBe(2);
       expect(redirectToLogin).toHaveBeenCalledTimes(1);
-      expect(queryClient.getQueryCache().getAll()).toHaveLength(0);
+      expect(queryClient.getQueryData(authUserKey)).toBeNull();
+      expect(queryClient.getQueryData(['tickets'])).toBeUndefined();
     },
   );
 
@@ -325,7 +327,7 @@ describe('API client', () => {
     expect(attempts).toBe(2);
     expect(refreshes).toBe(1);
     expect(redirectToLogin).toHaveBeenCalledOnce();
-    expect(queryClient.getQueryData(authUserKey)).toBeUndefined();
+    expect(queryClient.getQueryData(authUserKey)).toBeNull();
   });
 
   it.each(['/auth/login', '/auth/register'] as const)(
