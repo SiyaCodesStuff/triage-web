@@ -1,6 +1,9 @@
 import '@testing-library/jest-dom/vitest';
-import { cleanup } from '@testing-library/react';
+import { cleanup, configure } from '@testing-library/react';
 import { afterEach, beforeEach, vi } from 'vitest';
+
+// Allow React Router transitions and MSW requests to settle on constrained WSL hosts.
+configure({ asyncUtilTimeout: 5000 });
 
 beforeEach(() => {
   window.localStorage.clear();

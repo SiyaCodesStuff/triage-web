@@ -42,7 +42,7 @@ Vite, and tests. The application and configuration use strict TypeScript.
 ## Application shell
 
 Routes: `/login`, `/register`, `/tickets`, `/tickets/:id`, and `/admin/users`.
-The root redirects to `/tickets`; unmatched paths show a 404 page. Ticket and user management pages remain placeholders. Login and registration are
+The root redirects to `/tickets`; unmatched paths show a 404 page. Ticket details and user management pages remain placeholders. Login and registration are
 implemented, and private routes require an authenticated session.
 
 The responsive shell includes main navigation, a skip link, and focus management
@@ -120,3 +120,15 @@ The API remains responsible for enforcing authorization. Guards preserve the
 path, query, and hash in router state; expiry redirects use a local `returnTo`
 query parameter. Login and registration return to that destination, defaulting
 to `/tickets`; external destinations and auth-page loops are rejected.
+
+## Ticket list
+
+`/tickets` loads the API's paginated ticket list. Apply filters commits search,
+status, priority, staff assignee UUID, sorting, and page size to the URL and resets
+to page 1. Pagination pushes history entries; browser back/forward restores the
+controls and result query. Defaults are page 1, page size 20, created date descending.
+Invalid URL values are normalized to valid defaults; USER requests omit staff-only
+filters. Previous results remain visible while changing pages, with an updating
+message and disabled paging controls until the requested page arrives.
+
+Vitest uses at most two workers to avoid jsdom memory and CPU contention in WSL.
