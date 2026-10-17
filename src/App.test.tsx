@@ -19,6 +19,11 @@ beforeAll(() => server.listen({ onUnhandledFrame: 'error' }));
 beforeEach(() => {
   queryClient.clear();
   server.use(
+    http.get(`${base}/users`, () =>
+      HttpResponse.json({ data: { data: [], page: 1, limit: 20, total: 0 } }),
+    ),
+  );
+  server.use(
     http.get(`${base}/tickets/:id/comments`, () =>
       HttpResponse.json({ data: { data: [], page: 1, limit: 50, total: 0 } }),
     ),
