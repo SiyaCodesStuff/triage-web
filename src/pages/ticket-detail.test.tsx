@@ -283,3 +283,218 @@ describe('Ticket details and editing', () => {
     expect(notify).toHaveBeenCalled();
   });
 });
+
+describe('Ticket form coverage gaps', () => {
+  it('validates title and description locally before making a request', async () => {
+    const create = vi.fn();
+    server.use(http.post(`${base}/tickets`, create));
+    renderAuthApp('/tickets/new');
+    const title = await screen.findByLabelText('Title');
+    fireEvent.change(title, { target: { value: 'ab' } });
+    fireEvent.change(screen.getByLabelText('Description'), {
+      target: { value: '   ' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save ticket' }));
+    await waitFor(() =>
+      expect(title).toHaveAccessibleDescription(
+        'Title must be at least 3 characters.',
+      ),
+    );
+    expect(title).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByLabelText('Description')).toHaveAccessibleDescription(
+      'Enter a description.',
+    );
+    expect(title).toHaveFocus();
+    expect(create).not.toHaveBeenCalled();
+  });
+
+  it('rejects an invalid assignee UUID without patching', async () => {
+    role = 'AGENT';
+    const patch = vi.fn();
+    server.use(http.patch(`${base}/tickets/:id`, patch));
+    renderAuthApp(`/tickets/${ticket.id}/edit`);
+    const assignee = await screen.findByLabelText(
+      'Assigned to (staff user ID)',
+    );
+    fireEvent.change(assignee, { target: { value: 'not-a-uuid' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save ticket' }));
+    await waitFor(() =>
+      expect(assignee).toHaveAttribute('aria-invalid', 'true'),
+    );
+    expect(assignee).toHaveAccessibleDescription(
+      /Enter a valid staff user UUID/,
+    );
+    expect(patch).not.toHaveBeenCalled();
+  });
+
+  it('maps every supported server field error and ignores malformed or unknown details', async () => {
+    role = 'AGENT';
+    const fields = [
+      ['title', 'Title'],
+      ['description', 'Description'],
+      ['priority', 'Priority'],
+      ['assignedTo', 'Assigned to (staff user ID)'],
+      ['status', 'Status'],
+    ] as const;
+    server.use(
+      http.patch(`${base}/tickets/:id`, () =>
+        HttpResponse.json(
+          {
+            error: {
+              code: 'VALIDATION_ERROR',
+              message: 'Review ticket fields.',
+              details: [
+                ...fields.map(([field]) => ({
+                  path: ['body', field],
+                  message: `Server rejected ${field}.`,
+                })),
+                null,
+                { path: 'invalid', message: 'Malformed detail' },
+                { path: ['body', 'unknown'], message: 'Unknown field' },
+                { path: [], message: 'Empty path' },
+              ],
+            },
+          },
+          { status: 400 },
+        ),
+      ),
+    );
+    renderAuthApp(`/tickets/${ticket.id}/edit`);
+    fireEvent.change(await screen.findByLabelText('Title'), {
+      target: { value: 'Changed title' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save ticket' }));
+    for (const [field, label] of fields) {
+      await waitFor(() =>
+        expect(screen.getByLabelText(label)).toHaveAccessibleDescription(
+          new RegExp(`Server rejected ${field}\\.`),
+        ),
+      );
+      expect(screen.getByLabelText(label)).toHaveAttribute(
+        'aria-invalid',
+        'true',
+      );
+    }
+    expect(screen.queryByText('Malformed detail')).not.toBeInTheDocument();
+    expect(screen.queryByText('Unknown field')).not.toBeInTheDocument();
+    expect(screen.queryByText('Empty path')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Title')).toHaveValue('Changed title');
+    expect(
+      within(screen.getByRole('form', { name: 'Edit ticket' })).getByText(
+        'Review ticket fields.',
+      ),
+    ).toBeVisible();
+  });
+
+  it('keeps unsaved input and enables retry after a server failure with no field details', async () => {
+    server.use(
+      http.patch(`${base}/tickets/:id`, () =>
+        HttpResponse.json(
+          {
+            error: {
+              code: 'INTERNAL_ERROR',
+              message: 'Server unavailable.',
+              details: { requestId: 'test-request' },
+            },
+          },
+          { status: 500 },
+        ),
+      ),
+    );
+    renderAuthApp(`/tickets/${ticket.id}/edit`);
+    fireEvent.change(await screen.findByLabelText('Title'), {
+      target: { value: 'Unsaved title' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save ticket' }));
+    const form = screen.getByRole('form', { name: 'Edit ticket' });
+    expect(await within(form).findByRole('alert')).toHaveTextContent(
+      'Server unavailable.',
+    );
+    expect(screen.getByLabelText('Title')).toHaveValue('Unsaved title');
+    expect(screen.getByRole('button', { name: 'Save ticket' })).toBeEnabled();
+    expect(
+      screen.queryByRole('button', { name: 'Reload ticket' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('reloads the server version after conflict and discards the stale draft', async () => {
+    const invalidation = vi.spyOn(queryClient, 'invalidateQueries');
+    server.use(
+      http.patch(`${base}/tickets/:id`, () =>
+        HttpResponse.json(
+          {
+            error: {
+              code: 'CONFLICT',
+              message: 'Ticket changed on the server.',
+            },
+          },
+          { status: 409 },
+        ),
+      ),
+    );
+    renderAuthApp(`/tickets/${ticket.id}/edit`);
+    fireEvent.change(await screen.findByLabelText('Title'), {
+      target: { value: 'Stale draft' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save ticket' }));
+    const reload = await screen.findByRole('button', { name: 'Reload ticket' });
+    record = {
+      ...record,
+      title: 'New server title',
+      description: 'New server description',
+      updatedAt: '2026-10-17T12:00:00.000Z',
+    };
+    fireEvent.click(reload);
+    await waitFor(() =>
+      expect(screen.getByLabelText('Title')).toHaveValue('New server title'),
+    );
+    expect(screen.getByLabelText('Description')).toHaveValue(
+      'New server description',
+    );
+    expect(invalidation).toHaveBeenCalledWith({
+      queryKey: ['ticket', ticket.id],
+    });
+    expect(
+      screen.queryByRole('button', { name: 'Reload ticket' }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Save ticket' })).toBeDisabled();
+  });
+
+  it.each([false, true])(
+    'cancels without saving (editing: %s)',
+    async (editing) => {
+      const write = vi.fn();
+      server.use(
+        http.post(`${base}/tickets`, write),
+        http.patch(`${base}/tickets/:id`, write),
+      );
+      renderAuthApp(editing ? `/tickets/${ticket.id}/edit` : '/tickets/new');
+      fireEvent.change(await screen.findByLabelText('Title'), {
+        target: { value: 'Discard this draft' },
+      });
+      fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+      expect(
+        await screen.findByRole('heading', {
+          name: editing ? ticket.title : 'Tickets',
+        }),
+      ).toBeVisible();
+      expect(screen.queryByLabelText('Title')).not.toBeInTheDocument();
+      expect(write).not.toHaveBeenCalled();
+    },
+  );
+
+  it('does not send a patch when trimming removes the only change', async () => {
+    const patch = vi.fn();
+    server.use(http.patch(`${base}/tickets/:id`, patch));
+    renderAuthApp(`/tickets/${ticket.id}/edit`);
+    fireEvent.change(await screen.findByLabelText('Title'), {
+      target: { value: `${ticket.title} ` },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save ticket' }));
+    const form = screen.getByRole('form', { name: 'Edit ticket' });
+    expect(await within(form).findByRole('alert')).toHaveTextContent(
+      'Make a change before saving.',
+    );
+    expect(patch).not.toHaveBeenCalled();
+  });
+});
