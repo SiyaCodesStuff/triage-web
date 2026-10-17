@@ -42,7 +42,7 @@ Vite, and tests. The application and configuration use strict TypeScript.
 ## Application shell
 
 Routes: `/login`, `/register`, `/tickets`, `/tickets/:id`, and `/admin/users`.
-The root redirects to `/tickets`; unmatched paths show a 404 page. User management remains a placeholder. Login and registration are
+The root redirects to `/tickets`; unmatched paths show a 404 page. Ticket and user-management routes are implemented. Login and registration are
 implemented, and private routes require an authenticated session.
 
 The responsive shell includes main navigation, a skip link, and focus management
@@ -157,3 +157,12 @@ the draft, displays inline/toast feedback, and refreshes the ticket status.
 Authors and ADMINs can delete comments, including on closed tickets; AGENTs have
 no deletion override. Comment mutations invalidate all pages of the ticket's
 thread, and deleting a ticket also removes its cached comments.
+
+## User administration
+
+`/admin/users` requires ADMIN access. Search uses the API's `search` name/email
+filter with `page` and `limit` pagination, reflected in the URL. Selecting a new
+role opens a confirmation dialog; cancelling sends no request. Successful PATCH
+requests invalidate user lists. Your own role select is disabled with an
+explanation, and self-demotion is also guarded before submission. API errors,
+including 403 self-demotion rejections, remain visible in the dialog and a toast.
