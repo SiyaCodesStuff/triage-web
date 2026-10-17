@@ -1,3 +1,4 @@
+import { expectAccessible } from '@/test/accessibility';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { HttpResponse, http } from 'msw';
 import { toast } from 'sonner';
@@ -153,6 +154,7 @@ describe('User administration', () => {
     });
     const dialog = await screen.findByRole('alertdialog');
     expect(dialog).toHaveAccessibleName('Confirm role change');
+    await expectAccessible();
     expect(dialog).toHaveTextContent('from USER to AGENT');
     expect(patches).toBe(0);
     fireEvent.click(
@@ -163,6 +165,9 @@ describe('User administration', () => {
     );
     expect(screen.getByLabelText(`Role for ${target.email}`)).toHaveValue(
       'AGENT',
+    );
+    await waitFor(() =>
+      expect(screen.getByLabelText(`Role for ${target.email}`)).toHaveFocus(),
     );
     expect(patches).toBe(1);
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ['users'] });

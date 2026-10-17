@@ -8,6 +8,8 @@ import { api, ApiError } from '@/api/client';
 import type { components } from '@/api/schema';
 import { useAuth } from '@/auth/context';
 import { authUserKey } from '@/auth/session';
+import { LiveStatus } from '@/components/live-status';
+import { TableRegion } from '@/components/table-region';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
@@ -30,6 +32,7 @@ function message(error: unknown) {
 export function AdminUsersPage() {
   const { user } = useAuth();
   const cache = useQueryClient();
+  const headingRef = useRef<HTMLHeadingElement>(null);
   const roleTrigger = useRef<HTMLSelectElement | null>(null);
   const [params, setParams] = useSearchParams();
   const query = filters.parse(Object.fromEntries(params));
@@ -90,13 +93,19 @@ export function AdminUsersPage() {
     const next = new URLSearchParams(canonical);
     next.set('page', String(page));
     setParams(next);
+    headingRef.current?.focus();
   }
   const data = users.data?.data;
   const totalPages = Math.max(1, Math.ceil((data?.total ?? 0) / query.limit));
   return (
     <section aria-labelledby="users-title" className="space-y-6">
       <div>
-        <h1 id="users-title" className="text-3xl font-semibold">
+        <h1
+          id="users-title"
+          ref={headingRef}
+          tabIndex={-1}
+          className="text-3xl font-semibold"
+        >
           Users
         </h1>
         <p className="mt-2 text-muted-foreground">
@@ -120,6 +129,7 @@ export function AdminUsersPage() {
             limit: String(values.limit),
             ...(values.search ? { search: values.search } : {}),
           });
+          headingRef.current?.focus();
         }}
       >
         <div className="min-w-48 flex-1 space-y-2">
@@ -153,7 +163,10 @@ export function AdminUsersPage() {
         <Button
           type="button"
           variant="outline"
-          onClick={() => setParams({ page: '1', limit: '20' })}
+          onClick={() => {
+            setParams({ page: '1', limit: '20' });
+            headingRef.current?.focus();
+          }}
         >
           Reset
         </Button>
@@ -163,7 +176,15 @@ export function AdminUsersPage() {
           {localError}
         </p>
       )}
-      {users.isPending && <p role="status">Loading users…</p>}
+      <LiveStatus label="User results summary">
+        {users.isPending
+          ? 'Loading users…'
+          : users.isError
+            ? ''
+            : data
+              ? `${data.total} ${data.total === 1 ? 'user' : 'users'}. Page ${data.page} of ${totalPages}.`
+              : ''}
+      </LiveStatus>
       {users.isError && (
         <div className="space-y-3">
           <p role="alert">{message(users.error)}</p>
@@ -178,15 +199,12 @@ export function AdminUsersPage() {
       )}
       {data && !users.isError && (
         <>
-          <p role="status" className="text-sm text-muted-foreground">
-            {data.total} {data.total === 1 ? 'user' : 'users'}
-          </p>
           {data.data.length === 0 ? (
             <p className="rounded-xl border p-6">
               No users found. Try another search.
             </p>
           ) : (
-            <div className="overflow-x-auto rounded-xl border">
+            <TableRegion label="User results">
               <table className="w-full text-left text-sm">
                 <caption className="sr-only">Users, page {data.page}</caption>
                 <thead className="bg-muted">
@@ -221,7 +239,7 @@ export function AdminUsersPage() {
                           id={`role-${account.id}`}
                           className="h-10 rounded-md border bg-background px-3 disabled:opacity-60"
                           value={account.role}
-                          disabled={account.id === user?.id || change.isPending}
+                          disabled={account.id === user?.id}
                           aria-describedby={
                             account.id === user?.id
                               ? 'self-role-help'
@@ -251,7 +269,7 @@ export function AdminUsersPage() {
                   ))}
                 </tbody>
               </table>
-            </div>
+            </TableRegion>
           )}
           <nav
             aria-label="User pagination"
@@ -307,6 +325,9 @@ export function AdminUsersPage() {
               {pending?.role}? This changes their access on their next API
               request.
             </AlertDialog.Description>
+            <LiveStatus label="Role update status">
+              {change.isPending ? 'Updating role…' : ''}
+            </LiveStatus>
             {change.isError && (
               <p role="alert" className="text-destructive">
                 {message(change.error)}

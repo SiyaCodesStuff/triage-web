@@ -1,3 +1,4 @@
+import { expectAccessible } from '@/test/accessibility';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { HttpResponse, http } from 'msw';
 import {
@@ -82,6 +83,7 @@ describe('Tickets page', () => {
     expect(sent.get('sort')).toBe('priority');
     expect(sent.get('order')).toBe('asc');
     expect(screen.getByText('Page 2 of 3')).toBeVisible();
+    await expectAccessible();
   });
 
   it('applies search, filters, sorting and page size to URL and resets the page', async () => {

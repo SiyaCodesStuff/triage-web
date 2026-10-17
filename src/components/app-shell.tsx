@@ -35,15 +35,18 @@ export function AppShell() {
     }
   }
   const mainRef = useRef<HTMLElement>(null);
+  const previousPath = useRef(pathname);
 
   useEffect(() => {
-    mainRef.current?.focus();
+    if (previousPath.current !== pathname) mainRef.current?.focus();
+    previousPath.current = pathname;
   }, [pathname]);
 
   return (
     <div className="flex min-h-svh flex-col">
       <a
         href="#main-content"
+        onClick={() => mainRef.current?.focus()}
         className="sr-only rounded-md bg-primary px-4 py-2 text-primary-foreground focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50"
       >
         Skip to content
@@ -92,7 +95,7 @@ export function AppShell() {
         id="main-content"
         ref={mainRef}
         tabIndex={-1}
-        className="mx-auto w-full max-w-6xl flex-1 px-4 py-10 focus:outline-none sm:px-6 sm:py-14"
+        className="mx-auto w-full max-w-6xl flex-1 px-4 py-10 sm:px-6 sm:py-14"
       >
         {logoutError && (
           <p role="alert" className="mb-4 text-destructive">

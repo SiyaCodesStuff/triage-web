@@ -198,6 +198,9 @@ describe('Comment thread', () => {
       expect(screen.queryByText('First comment')).not.toBeInTheDocument(),
     );
     expect(screen.getByText('Second comment')).toBeVisible();
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { name: 'Comments' })).toHaveFocus(),
+    );
   });
 
   it('handles a closing race with 409 feedback, a preserved draft, and disabled composer', async () => {

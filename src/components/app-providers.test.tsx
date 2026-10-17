@@ -59,6 +59,9 @@ describe('AppProviders', () => {
     expect(
       screen.getByRole('region', { name: /Notifications/ }),
     ).toBeInTheDocument();
+    expect(
+      screen.getByRole('region', { name: /Notifications/ }),
+    ).toHaveAttribute('aria-live', 'polite');
     fireEvent.click(screen.getByRole('button', { name: /Close toast/i }));
     await waitFor(() =>
       expect(screen.queryByText('Ticket saved')).not.toBeInTheDocument(),

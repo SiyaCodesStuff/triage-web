@@ -1,4 +1,4 @@
-import { Component, type ReactNode } from 'react';
+import { Component, createRef, type ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 
 type Props = { children: ReactNode };
@@ -6,6 +6,11 @@ type State = { hasError: boolean };
 
 export class ErrorBoundary extends Component<Props, State> {
   state: State = { hasError: false };
+  private fallback = createRef<HTMLElement>();
+
+  componentDidCatch() {
+    this.fallback.current?.focus();
+  }
 
   static getDerivedStateFromError(): State {
     return { hasError: true };
@@ -14,7 +19,11 @@ export class ErrorBoundary extends Component<Props, State> {
   render() {
     if (this.state.hasError) {
       return (
-        <main className="mx-auto flex min-h-svh max-w-xl flex-col justify-center gap-4 px-6">
+        <main
+          ref={this.fallback}
+          tabIndex={-1}
+          className="mx-auto flex min-h-svh max-w-xl flex-col justify-center gap-4 px-6"
+        >
           <h1 className="text-3xl font-semibold tracking-tight">
             Something went wrong
           </h1>

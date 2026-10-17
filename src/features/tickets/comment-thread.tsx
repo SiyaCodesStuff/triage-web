@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { api, ApiError } from '@/api/client';
 import { useAuth } from '@/auth/context';
 import type { Ticket } from '@/features/tickets/detail';
+import { LiveStatus } from '@/components/live-status';
 import { Button } from '@/components/ui/button';
 
 const schema = z.object({
@@ -28,6 +29,7 @@ function errorMessage(error: unknown) {
 export function CommentThread({ ticket }: { ticket: Ticket }) {
   const { user } = useAuth();
   const cache = useQueryClient();
+  const headingRef = useRef<HTMLHeadingElement>(null);
   const [page, setPage] = useState(1);
   const comments = useQuery({
     queryKey: ['comments', ticket.id, user?.id, user?.role, page],
@@ -62,6 +64,7 @@ export function CommentThread({ ticket }: { ticket: Ticket }) {
       await cache.invalidateQueries({ queryKey: ['comments', ticket.id] });
       setPage(lastPage);
       toast.success('Comment added.');
+      headingRef.current?.focus();
     },
     onError: (error) => {
       toast.error(errorMessage(error));
@@ -78,6 +81,7 @@ export function CommentThread({ ticket }: { ticket: Ticket }) {
       await cache.invalidateQueries({ queryKey: ['comments', ticket.id] });
       if (comments.data?.data.data.length === 1 && page > 1) setPage(page - 1);
       toast.success('Comment deleted.');
+      headingRef.current?.focus();
     },
     onError: (error) => toast.error(errorMessage(error)),
   });
@@ -92,12 +96,25 @@ export function CommentThread({ ticket }: { ticket: Ticket }) {
       className="space-y-5 border-t pt-6"
     >
       <div>
-        <h2 id="comments-title" className="text-xl font-semibold">
+        <h2
+          id="comments-title"
+          ref={headingRef}
+          tabIndex={-1}
+          className="text-xl font-semibold"
+        >
           Comments
         </h2>
         <p className="text-sm text-muted-foreground">Oldest first</p>
       </div>
-      {comments.isPending && <p role="status">Loading comments…</p>}
+      <LiveStatus label="Comment results summary">
+        {comments.isPending
+          ? 'Loading comments…'
+          : comments.isError
+            ? ''
+            : data
+              ? `${data.total} comments. Page ${data.page} of ${totalPages}.`
+              : ''}
+      </LiveStatus>
       {comments.isError && (
         <div className="space-y-2">
           <p role="alert">{errorMessage(comments.error)}</p>
@@ -168,14 +185,20 @@ export function CommentThread({ ticket }: { ticket: Ticket }) {
               <Button
                 variant="outline"
                 disabled={page <= 1 || comments.isFetching}
-                onClick={() => setPage(page - 1)}
+                onClick={() => {
+                  setPage(page - 1);
+                  headingRef.current?.focus();
+                }}
               >
                 Previous comments
               </Button>
               <Button
                 variant="outline"
                 disabled={page >= totalPages || comments.isFetching}
-                onClick={() => setPage(page + 1)}
+                onClick={() => {
+                  setPage(page + 1);
+                  headingRef.current?.focus();
+                }}
               >
                 Next comments
               </Button>
@@ -188,6 +211,13 @@ export function CommentThread({ ticket }: { ticket: Ticket }) {
           )}
         </>
       )}
+      <LiveStatus label="Comment update status">
+        {add.isPending
+          ? 'Adding comment…'
+          : remove.isPending
+            ? 'Deleting comment…'
+            : ''}
+      </LiveStatus>
       <form
         noValidate
         aria-label="Add comment"
@@ -225,9 +255,13 @@ export function CommentThread({ ticket }: { ticket: Ticket }) {
             className="w-full rounded-md border bg-background p-3 disabled:cursor-not-allowed disabled:opacity-60"
             {...register('body')}
             aria-invalid={Boolean(errors.body)}
-            aria-describedby={
-              errors.body ? 'comment-help comment-error' : 'comment-help'
-            }
+            aria-describedby={[
+              closed ? 'comments-closed' : '',
+              'comment-help',
+              errors.body ? 'comment-error' : '',
+            ]
+              .filter(Boolean)
+              .join(' ')}
           />
           <p id="comment-help" className="text-sm text-muted-foreground">
             Up to 4,000 characters.

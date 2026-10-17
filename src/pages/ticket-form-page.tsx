@@ -16,6 +16,7 @@ import {
 } from '@/features/tickets/detail';
 import { displayEnum, priorities, statuses } from '@/features/tickets/search';
 import { TicketError, ticketErrorMessage } from '@/components/ticket-error';
+import { LiveStatus } from '@/components/live-status';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
@@ -112,9 +113,13 @@ function TicketForm({ ticket }: { ticket?: Ticket }) {
   return (
     <section className="max-w-2xl space-y-6">
       <h1 className="text-3xl font-semibold">{title}</h1>
+      <LiveStatus label="Ticket save status">
+        {save.isPending ? 'Saving ticket…' : ''}
+      </LiveStatus>
       <form
         className="space-y-5 rounded-xl border bg-card p-6"
         noValidate
+        aria-label={title}
         aria-busy={save.isPending}
         onSubmit={(event) => {
           void handleSubmit(async (values) => {
@@ -152,6 +157,7 @@ function TicketForm({ ticket }: { ticket?: Ticket }) {
             <label htmlFor="edit-title">Title</label>
             <Input
               id="edit-title"
+              required
               maxLength={200}
               {...register('title')}
               aria-invalid={Boolean(errors.title)}
@@ -167,6 +173,7 @@ function TicketForm({ ticket }: { ticket?: Ticket }) {
             <label htmlFor="edit-description">Description</label>
             <textarea
               id="edit-description"
+              required
               className="min-h-40 w-full rounded-md border bg-background p-3"
               maxLength={10_000}
               {...register('description')}
@@ -189,6 +196,10 @@ function TicketForm({ ticket }: { ticket?: Ticket }) {
                   id="edit-priority"
                   className="h-10 w-full rounded-md border bg-background px-3"
                   {...register('priority')}
+                  aria-invalid={Boolean(errors.priority)}
+                  aria-describedby={
+                    errors.priority ? 'priority-error' : undefined
+                  }
                 >
                   {priorities.map((priority) => (
                     <option key={priority} value={priority}>
@@ -196,6 +207,11 @@ function TicketForm({ ticket }: { ticket?: Ticket }) {
                     </option>
                   ))}
                 </select>
+                {errors.priority && (
+                  <p id="priority-error" role="alert">
+                    {errors.priority.message}
+                  </p>
+                )}
               </div>
               {ticket && (
                 <>
@@ -206,6 +222,10 @@ function TicketForm({ ticket }: { ticket?: Ticket }) {
                       className="h-10 w-full rounded-md border bg-background px-3"
                       disabled={nextStatuses[ticket.status].length === 0}
                       {...register('status')}
+                      aria-invalid={Boolean(errors.status)}
+                      aria-describedby={
+                        errors.status ? 'status-error' : undefined
+                      }
                     >
                       <option value="">
                         Keep current status ({displayEnum(ticket.status)})
@@ -216,6 +236,11 @@ function TicketForm({ ticket }: { ticket?: Ticket }) {
                         </option>
                       ))}
                     </select>
+                    {errors.status && (
+                      <p id="status-error" role="alert">
+                        {errors.status.message}
+                      </p>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <label htmlFor="edit-assignee">

@@ -23,6 +23,7 @@ describe('ErrorBoundary', () => {
         <BrokenPage />
       </ErrorBoundary>,
     );
+    expect(screen.getByRole('main')).toHaveFocus();
     expect(
       screen.getByRole('heading', { name: 'Something went wrong' }),
     ).toBeVisible();
