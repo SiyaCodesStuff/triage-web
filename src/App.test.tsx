@@ -1,5 +1,4 @@
 import { fireEvent, screen, within } from '@testing-library/react';
-import { HttpResponse, http } from 'msw';
 import {
   afterAll,
   afterEach,
@@ -11,41 +10,14 @@ import {
 } from 'vitest';
 import { renderAuthApp } from '@/test/auth-app';
 import { server } from '@/test/server';
-import { ticket, user } from '@/test/fixtures';
+import { createUser, ticket } from '@/test/fixtures';
+import { createHandlers } from '@/test/handlers';
 import { queryClient } from '@/lib/query-client';
 
-const base = `${window.location.origin}/api/v1`;
 beforeAll(() => server.listen({ onUnhandledFrame: 'error' }));
 beforeEach(() => {
   queryClient.clear();
-  server.use(
-    http.get(`${base}/users`, () =>
-      HttpResponse.json({ data: { data: [], page: 1, limit: 20, total: 0 } }),
-    ),
-  );
-  server.use(
-    http.get(`${base}/tickets/:id/comments`, () =>
-      HttpResponse.json({ data: { data: [], page: 1, limit: 50, total: 0 } }),
-    ),
-  );
-  server.use(
-    http.get(`${base}/tickets/:id`, ({ params }) =>
-      HttpResponse.json({ data: { ...ticket, id: String(params.id) } }),
-    ),
-  );
-  server.use(
-    http.get(`${base}/tickets`, () =>
-      HttpResponse.json({
-        data: [],
-        meta: { page: 1, pageSize: 20, total: 0, totalPages: 0 },
-      }),
-    ),
-  );
-  server.use(
-    http.get(`${base}/users/me`, () =>
-      HttpResponse.json({ data: { ...user, role: 'ADMIN' } }),
-    ),
-  );
+  server.use(...createHandlers({ currentUser: createUser({ role: 'ADMIN' }) }));
 });
 afterEach(() => {
   server.resetHandlers();
@@ -59,7 +31,7 @@ describe('Application routes', () => {
     ['/login', 'Log in'],
     ['/register', 'Create an account'],
     ['/tickets', 'Tickets'],
-    ['/tickets/abc-123', 'Printer issue'],
+    [`/tickets/${ticket.id}`, 'Printer issue'],
     ['/admin/users', 'Users'],
   ])('renders %s', async (path, title) => {
     renderAuthApp(path);

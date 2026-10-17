@@ -197,3 +197,25 @@ former dark destructive hover/white-text pair at about 3.43:1. Revised control
 borders are 4.74:1 (light card) and 7.10:1 (dark card); destructive hover text is
 5.59:1 and 5.40:1 respectively. Focus rings are 5.17:1 and 9.93:1 against cards.
 These are token/compositing calculations, not claims about untested browser output.
+
+## Shared test utilities and coverage
+
+`src/test/render.tsx` exports `renderWithProviders(ui, { path })`, using the real
+query, theme, router, and auth providers. `renderAuthApp` builds on this helper.
+The app's auth client updates a singleton query cache, so clear `queryClient` in
+both `beforeEach` and `afterEach` to isolate tests.
+
+`createUser(overrides)` in `src/test/fixtures.ts` returns independent users with
+unique UUIDs/emails and typed overrides. `createHandlers({ currentUser })` in
+`src/test/handlers.ts` provides baseline session, empty-list, and fixture-ticket
+responses. Pass `currentUser: null` for guests. Register these with
+`server.use(...createHandlers(...))`; override individual scenarios with later
+`server.use()` calls. Keep `server.listen`, `resetHandlers`, and `close` in the
+test lifecycle, with unhandled requests treated as errors.
+
+Run `npm run test:coverage` for V8 coverage. The aggregate line threshold is 80%;
+falling below it fails the command. All application TypeScript files are included,
+including unvisited files, except tests/helpers, generated declaration files, and
+`src/main.tsx` (the DOM bootstrap). Reports include the console table,
+`coverage/index.html`, and `coverage/coverage-summary.json`. Coverage artifacts are
+already ignored.

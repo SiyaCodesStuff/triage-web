@@ -1,5 +1,12 @@
 import type { components } from '@/api/schema';
 
+type User = components['schemas']['User'];
+
+export function createUser(overrides: Partial<User> = {}): User {
+  const id = crypto.randomUUID();
+  return { ...user, id, email: `user-${id}@example.com`, ...overrides };
+}
+
 export const user = {
   id: 'd8aeea22-5b82-4538-81b2-e10fa74fc407',
   name: 'Alex',

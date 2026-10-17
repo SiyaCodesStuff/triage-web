@@ -35,6 +35,18 @@ export default defineConfig(({ mode }) => {
       testTimeout: 10_000,
       setupFiles: ['./src/test/setup.ts'],
       clearMocks: true,
+      coverage: {
+        provider: 'v8',
+        include: ['src/**/*.{ts,tsx}'],
+        exclude: [
+          'src/**/*.d.ts',
+          'src/**/*.test.{ts,tsx}',
+          'src/test/**',
+          'src/main.tsx',
+        ],
+        reporter: [['text', { maxCols: 180, skipFull: false }], 'html', 'json-summary'],
+        thresholds: { lines: 80 },
+      },
     },
   };
 });

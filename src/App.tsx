@@ -1,12 +1,37 @@
+import { lazy } from 'react';
 import { Navigate, Route, Routes } from 'react-router';
 import { AppShell } from '@/components/app-shell';
 import { ProtectedRoute, RoleRoute } from '@/auth/protected-route';
-import { AuthPage } from '@/pages/auth-page';
 import { NotFoundPage } from '@/pages/not-found-page';
-import { AdminUsersPage } from '@/pages/admin-users-page';
-import { TicketsPage } from '@/pages/tickets-page';
-import { CreateTicketPage, EditTicketPage } from '@/pages/ticket-form-page';
-import { TicketPage } from '@/pages/ticket-page';
+
+const AuthPage = lazy(() =>
+  import('@/pages/auth-page').then((module) => ({ default: module.AuthPage })),
+);
+const TicketsPage = lazy(() =>
+  import('@/pages/tickets-page').then((module) => ({
+    default: module.TicketsPage,
+  })),
+);
+const TicketPage = lazy(() =>
+  import('@/pages/ticket-page').then((module) => ({
+    default: module.TicketPage,
+  })),
+);
+const AdminUsersPage = lazy(() =>
+  import('@/pages/admin-users-page').then((module) => ({
+    default: module.AdminUsersPage,
+  })),
+);
+const CreateTicketPage = lazy(() =>
+  import('@/pages/ticket-form-page').then((module) => ({
+    default: module.CreateTicketPage,
+  })),
+);
+const EditTicketPage = lazy(() =>
+  import('@/pages/ticket-form-page').then((module) => ({
+    default: module.EditTicketPage,
+  })),
+);
 
 export default function App() {
   return (
