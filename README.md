@@ -166,3 +166,34 @@ role opens a confirmation dialog; cancelling sends no request. Successful PATCH
 requests invalidate user lists. Your own role select is disabled with an
 explanation, and self-demotion is also guarded before submission. API errors,
 including 403 self-demotion rejections, remain visible in the dialog and a toast.
+
+## Accessibility checks
+
+The shell keeps the skip link first in keyboard order, focuses main content on
+route changes, and preserves visible focus. Search/reset/pagination actions move
+focus to a stable results heading; removing a comment returns focus to the thread.
+Confirmation dialogs trap focus, support Escape when idle, and return focus to
+the triggering control. The error boundary focuses its recovery content.
+
+Tables retain native captions and row/column headers inside labelled, keyboard-
+scrollable regions. Persistent polite, atomic live regions announce async result
+counts/pages and mutations; Sonner's existing labelled polite notification region
+is covered by tests. Required fields and field-specific error associations are
+explicit, including the closed-comment explanation.
+
+Shared theme tokens now provide stronger input borders, opaque visible focus
+outlines, and separate destructive-button foregrounds in light/dark modes.
+Tests check actual text token pairs at 4.5:1 and controls/focus at 3:1.
+`vitest-axe` scans login, registration, lists, detail/edit/create, 404, and dialogs.
+Axe's color-contrast rule is disabled in jsdom because it has no layout/paint
+engine; token checks are separate. These checks do not replace browser zoom,
+forced-colors, or screen-reader testing of rendered content.
+
+Use WSL Node 24 (`nvm use`) before installing or running checks; a Windows npm
+on a WSL path cannot reliably manage the project's Unix dependency symlinks.
+
+The audit measured the former light input border at 1.39:1 against white and the
+former dark destructive hover/white-text pair at about 3.43:1. Revised control
+borders are 4.74:1 (light card) and 7.10:1 (dark card); destructive hover text is
+5.59:1 and 5.40:1 respectively. Focus rings are 5.17:1 and 9.93:1 against cards.
+These are token/compositing calculations, not claims about untested browser output.

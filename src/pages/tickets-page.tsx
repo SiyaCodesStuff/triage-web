@@ -1,8 +1,10 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { api, ApiError } from '@/api/client';
 import { useAuth } from '@/auth/context';
+import { LiveStatus } from '@/components/live-status';
+import { TableRegion } from '@/components/table-region';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -19,6 +21,7 @@ const selectClass =
 
 export function TicketsPage() {
   const { user } = useAuth();
+  const headingRef = useRef<HTMLHeadingElement>(null);
   const isStaff = user?.role === 'AGENT' || user?.role === 'ADMIN';
   const [params, setParams] = useSearchParams();
   const query = readTicketSearch(params, isStaff);
@@ -48,6 +51,7 @@ export function TicketsPage() {
 
   function changePage(nextPage: number) {
     setParams(writeTicketSearch({ ...query, page: nextPage }));
+    headingRef.current?.focus();
   }
   const data = tickets.data;
   const hasFilters = Boolean(
@@ -59,6 +63,8 @@ export function TicketsPage() {
       <div className="space-y-2">
         <h1
           id="tickets-title"
+          ref={headingRef}
+          tabIndex={-1}
           className="text-3xl font-semibold tracking-tight"
         >
           Tickets
@@ -84,6 +90,7 @@ export function TicketsPage() {
           }
           next.set('page', '1');
           setParams(writeTicketSearch(readTicketSearch(next, isStaff)));
+          headingRef.current?.focus();
         }}
       >
         <div className="space-y-2 sm:col-span-2">
@@ -200,22 +207,36 @@ export function TicketsPage() {
           <Button
             type="button"
             variant="outline"
-            onClick={() =>
+            onClick={() => {
               setParams(
                 writeTicketSearch(
                   readTicketSearch(new URLSearchParams(), isStaff),
                 ),
-              )
-            }
+              );
+              headingRef.current?.focus();
+            }}
           >
             Reset
           </Button>
         </div>
       </form>
 
+      <LiveStatus
+        label={tickets.isPending ? 'Loading tickets' : 'Ticket results summary'}
+      >
+        {tickets.isPending
+          ? 'Loading tickets…'
+          : tickets.isError
+            ? ''
+            : tickets.isPlaceholderData
+              ? `Loading page ${page}… Showing previous results.`
+              : data
+                ? `${data.meta.total} ${data.meta.total === 1 ? 'ticket' : 'tickets'}. Page ${data.meta.page} of ${Math.max(1, data.meta.totalPages)}.`
+                : ''}
+      </LiveStatus>
       <div aria-busy={tickets.isFetching} className="space-y-4">
         {tickets.isPending && (
-          <div role="status" aria-label="Loading tickets">
+          <div aria-hidden="true">
             <span className="sr-only">Loading tickets…</span>
             <div aria-hidden="true" className="space-y-3 rounded-xl border p-4">
               {[0, 1, 2, 3, 4].map((row) => (
@@ -245,11 +266,6 @@ export function TicketsPage() {
         )}
         {data && !tickets.isError && (
           <>
-            <p role="status" className="text-sm text-muted-foreground">
-              {tickets.isPlaceholderData
-                ? `Loading page ${page}… Showing previous results.`
-                : `${data.meta.total} ${data.meta.total === 1 ? 'ticket' : 'tickets'}`}
-            </p>
             {data.data.length === 0 ? (
               <div className="space-y-2 rounded-xl border bg-card p-8 text-center">
                 <h2 className="text-lg font-semibold">No tickets found</h2>
@@ -260,13 +276,7 @@ export function TicketsPage() {
                 </p>
               </div>
             ) : (
-              <div
-                className="overflow-x-auto rounded-xl border"
-                role="region"
-                aria-label="Ticket results"
-                // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- Enables keyboard scrolling of this overflow region.
-                tabIndex={0}
-              >
+              <TableRegion label="Ticket results">
                 <table className="w-full text-left text-sm">
                   <caption className="sr-only">
                     Support tickets, page {data.meta.page}
@@ -321,7 +331,7 @@ export function TicketsPage() {
                     ))}
                   </tbody>
                 </table>
-              </div>
+              </TableRegion>
             )}
             <nav
               aria-label="Ticket pagination"

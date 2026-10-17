@@ -8,7 +8,7 @@ import { queryClient } from '@/lib/query-client';
 function LocationProbe() {
   const location = useLocation();
   return (
-    <output aria-label="Current location">
+    <output aria-label="Current location" hidden>
       {location.pathname + location.search + location.hash}
     </output>
   );

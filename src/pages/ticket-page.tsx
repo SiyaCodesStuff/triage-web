@@ -9,6 +9,7 @@ import { useTicket, canEditTicket } from '@/features/tickets/detail';
 import { CommentThread } from '@/features/tickets/comment-thread';
 import { displayEnum } from '@/features/tickets/search';
 import { TicketError, ticketErrorMessage } from '@/components/ticket-error';
+import { LiveStatus } from '@/components/live-status';
 import { Button } from '@/components/ui/button';
 
 export function TicketPage() {
@@ -88,6 +89,9 @@ export function TicketPage() {
                     This permanently deletes the ticket and its comments. This
                     action cannot be undone.
                   </AlertDialog.Description>
+                  <LiveStatus label="Ticket deletion status">
+                    {deletion.isPending ? 'Deleting ticket…' : ''}
+                  </LiveStatus>
                   {deletion.isError && (
                     <p role="alert" className="text-destructive">
                       {ticketErrorMessage(deletion.error)}

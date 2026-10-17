@@ -19,6 +19,7 @@
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
@@ -45,10 +46,11 @@
   --muted-foreground: oklch(0.439 0 0);
   --accent: oklch(0.94 0 0);
   --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
+  --destructive: #b91c1c;
+  --destructive-foreground: #ffffff;
   --border: oklch(0.89 0 0);
-  --input: oklch(0.89 0 0);
-  --ring: oklch(0.556 0 0);
+  --input: #737373;
+  --ring: #2563eb;
 }
 
 .dark {
@@ -66,10 +68,11 @@
   --muted-foreground: oklch(0.708 0 0);
   --accent: oklch(0.269 0 0);
   --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
+  --destructive: #f87171;
+  --destructive-foreground: #18181b;
   --border: oklch(1 0 0 / 14%);
-  --input: oklch(1 0 0 / 18%);
-  --ring: oklch(0.708 0 0);
+  --input: #a3a3a3;
+  --ring: #93c5fd;
 }
 
 @layer base {
@@ -79,8 +82,20 @@
   body {
     @apply m-0 bg-background text-foreground antialiased;
   }
+  input,
+  select,
+  textarea,
+  [data-slot='button'][data-variant='outline'] {
+    border-color: var(--input);
+  }
   :focus-visible {
-    @apply outline-2 outline-offset-4 outline-ring;
+    outline: 2px solid var(--ring);
+    outline-offset: 3px;
+  }
+  input::placeholder,
+  textarea::placeholder {
+    color: var(--muted-foreground);
+    opacity: 1;
   }
 }
 
@@ -90,5 +105,11 @@
   *::after {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
+  }
+}
+
+@media (forced-colors: active) {
+  :focus-visible {
+    outline: 2px solid Highlight;
   }
 }

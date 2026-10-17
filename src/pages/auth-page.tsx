@@ -166,6 +166,7 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
                   </label>
                   <Input
                     id="name"
+                    required
                     autoComplete="name"
                     maxLength={120}
                     {...register('name')}
@@ -189,6 +190,7 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
                 </label>
                 <Input
                   id="email"
+                  required
                   type="email"
                   autoComplete="email"
                   maxLength={254}
@@ -212,6 +214,7 @@ export function AuthPage({ mode }: { mode: 'login' | 'register' }) {
                 </label>
                 <Input
                   id="password"
+                  required
                   type="password"
                   autoComplete={
                     isRegister ? 'new-password' : 'current-password'
