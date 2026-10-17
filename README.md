@@ -215,7 +215,22 @@ test lifecycle, with unhandled requests treated as errors.
 
 Run `npm run test:coverage` for V8 coverage. The aggregate line threshold is 80%;
 falling below it fails the command. All application TypeScript files are included,
-including unvisited files, except tests/helpers, generated declaration files, and
-`src/main.tsx` (the DOM bootstrap). Reports include the console table,
+including unvisited files and `src/main.tsx`. Exclusions are tests/helpers,
+generated declarations, the type-only API adapters (`src/api/types.ts`), and
+generated shadcn primitives (`src/components/ui`). Reports include the console table,
 `coverage/index.html`, and `coverage/coverage-summary.json`. Coverage artifacts are
 already ignored.
+
+## Theme initialization and script CSP
+
+The blocking `theme-bootstrap` script in the HTML head applies the saved or system
+light/dark theme before the app is parsed. It falls back to the system setting if
+storage is unavailable. A script-free React provider maintains live system/theme
+and storage changes after mounting.
+
+`build/script-csp.ts` adds a `script-src` CSP meta policy with same-origin sources
+and SHA-256 hashes of the exact inline script contents. It runs after Vite's HTML
+transforms, including development refresh scripts; no `unsafe-inline` is needed.
+If your production server sets an additional CSP header, authorize the same
+bootstrap hash there too: browsers enforce both policies. The generated
+`dist/index.html` contains the current hash; editing the script requires a rebuild.

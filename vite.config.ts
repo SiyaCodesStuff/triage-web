@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { loadEnv } from 'vite';
 import { defineConfig } from 'vitest/config';
+import { scriptCsp } from './build/script-csp.ts';
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), 'VITE_');
@@ -15,7 +16,7 @@ export default defineConfig(({ mode }) => {
   }
 
   return {
-    plugins: [react(), tailwindcss()],
+    plugins: [react(), tailwindcss(), scriptCsp()],
     resolve: {
       alias: {
         '@': fileURLToPath(new URL('./src', import.meta.url)),
@@ -42,9 +43,16 @@ export default defineConfig(({ mode }) => {
           'src/**/*.d.ts',
           'src/**/*.test.{ts,tsx}',
           'src/test/**',
-          'src/main.tsx',
+          // Type-only adapters over the generated API schema have no executable lines.
+          'src/api/types.ts',
+          // Generated shadcn UI primitives are outside application coverage.
+          'src/components/ui/**',
         ],
-        reporter: [['text', { maxCols: 180, skipFull: false }], 'html', 'json-summary'],
+        reporter: [
+          ['text', { maxCols: 180, skipFull: false }],
+          'html',
+          'json-summary',
+        ],
         thresholds: { lines: 80 },
       },
     },

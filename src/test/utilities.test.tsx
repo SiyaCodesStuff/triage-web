@@ -1,7 +1,7 @@
 import { screen } from '@testing-library/react';
 import { beforeAll, beforeEach, afterEach, afterAll, expect, it } from 'vitest';
 import { useLocation } from 'react-router';
-import { useTheme } from 'next-themes';
+import { useTheme } from '@/components/theme-context';
 import { useAuth } from '@/auth/context';
 import { queryClient } from '@/lib/query-client';
 import { createUser } from '@/test/fixtures';

@@ -1,0 +1,15 @@
+ README.md            |  19 [32m+[m[31m-[m
+ index.html           |  19 [32m+[m
+ package-lock.json    |  11 [31m-[m
+ package.json         |   1 [31m-[m
+ .../redirect.test.ts |  96 [32m++[m[31m-[m
+ src/auth/redirect.ts |  30 [32m+[m[31m-[m
+ ...roviders.test.tsx |  78 [32m+[m[31m-[m
+ ...app-providers.tsx |   9 [32m+[m[31m-[m
+ .../ui/sonner.tsx    |   2 [32m+[m[31m-[m
+ ...ceholder-page.tsx |  32 [31m-[m
+ ...t-detail.test.tsx | 215 [32m++++++[m
+ ...tilities.test.tsx |   2 [32m+[m[31m-[m
+ tsconfig.json        |   1 [32m+[m
+ vite.config.ts       |  14 [32m+[m[31m-[m
+ 14 files changed, 461 insertions(+), 68 deletions(-)
