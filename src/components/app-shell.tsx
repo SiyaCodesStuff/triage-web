@@ -1,8 +1,9 @@
-import { useState, useEffect, useRef } from 'react';
+import { Suspense, useState, useEffect, useRef } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router';
 import { LifeBuoy } from 'lucide-react';
 import { useAuth } from '@/auth/context';
 import { Button } from '@/components/ui/button';
+import { LiveStatus } from '@/components/live-status';
 import { cn } from '@/lib/utils';
 
 const guestLinks = [
@@ -36,10 +37,31 @@ export function AppShell() {
   }
   const mainRef = useRef<HTMLElement>(null);
   const previousPath = useRef(pathname);
+  const announcementRef = useRef<HTMLParagraphElement>(null);
 
   useEffect(() => {
     if (previousPath.current !== pathname) mainRef.current?.focus();
     previousPath.current = pathname;
+  }, [pathname]);
+
+  useEffect(() => {
+    const main = mainRef.current;
+    const announcement = announcementRef.current;
+    if (!main || !announcement) return;
+    announcement.textContent = '';
+    const announcePage = () => {
+      const title = main.querySelector('h1')?.textContent;
+      if (title && announcement.textContent !== title)
+        announcement.textContent = title;
+    };
+    const observer = new MutationObserver(announcePage);
+    observer.observe(main, {
+      childList: true,
+      subtree: true,
+      characterData: true,
+    });
+    announcePage();
+    return () => observer.disconnect();
   }, [pathname]);
 
   return (
@@ -91,6 +113,14 @@ export function AppShell() {
           </nav>
         </div>
       </header>
+      <p
+        ref={announcementRef}
+        role="status"
+        aria-label="Current page"
+        aria-live="polite"
+        aria-atomic="true"
+        className="sr-only"
+      />
       <main
         id="main-content"
         ref={mainRef}
@@ -102,7 +132,12 @@ export function AppShell() {
             {logoutError}
           </p>
         )}
-        <Outlet />
+        <Suspense
+          key={pathname}
+          fallback={<LiveStatus label="Page loading">Loading page…</LiveStatus>}
+        >
+          <Outlet />
+        </Suspense>
       </main>
       <footer className="border-t">
         <div className="mx-auto flex max-w-6xl flex-wrap justify-between gap-2 px-4 py-5 text-sm text-muted-foreground sm:px-6">
