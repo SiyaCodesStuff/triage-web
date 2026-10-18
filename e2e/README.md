@@ -118,3 +118,19 @@ To keep an existing development API running, start a separate API process with
 setting selects the readiness/spec endpoints and Vite proxy target; it is never
 bundled into the browser. Only local HTTP origins are accepted by the runner.
 Run Vitest and Playwright separately on memory-constrained WSL hosts.
+
+## Manual GitHub Actions run
+
+The frontend's `.github/workflows/e2e.yml` is dispatch-only. After it reaches the
+default branch, open **Actions → E2E (manual) → Run workflow**. The job checks out
+both repos, provisions disposable PostgreSQL, migrates it, seeds an automatically
+generated admin, starts the real API, installs Chromium/system libraries, and
+runs these tests. No local processes or credentials are used. The API is stopped
+afterward; the runner-local database is discarded with the job. Browser reports
+and the API log are uploaded for seven days, including after failures.
+
+The public API checkout is pinned to inspected commit
+`0b2d852959d9ac64e93576ee2b7489898e466e7f`. Review the source and update the pin
+when intentionally testing a newer API revision. No private-repository token is
+configured. See the main README for default CI details; Playwright is never part
+of that job.

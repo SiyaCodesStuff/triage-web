@@ -1,5 +1,7 @@
 # Triage Web
 
+[![CI](https://github.com/SiyaCodesStuff/triage-web/actions/workflows/ci.yml/badge.svg)](https://github.com/SiyaCodesStuff/triage-web/actions/workflows/ci.yml)
+
 React + TypeScript SPA for the Triage API. Requires Node 24 and npm.
 
 ## Development
@@ -22,8 +24,9 @@ Use relative API URLs based on this path. Cookie requests should include
 `credentials: 'include'`; unsafe API methods must send `X-CSRF-Protection: 1`
 as documented in `../triage-api/docs/auth.md`.
 
-The development proxy is not part of the production build or preview server.
-Production hosting must route the API path to the API server on the same site.
+The API proxy is not part of the static production build. Vite preview inherits
+the proxy for local and E2E runs; production hosting must route the API path to
+the API server on the same site.
 
 ## Commands
 
@@ -242,3 +245,29 @@ PostgreSQL. See [e2e/README.md](e2e/README.md) for Compose startup, database
 migration, admin seeding, browser installation, and credential setup. It uses
 unique accounts and separate browser sessions, and is not part of `npm test` or
 the default CI job.
+
+## GitHub Actions
+
+[CI](https://github.com/SiyaCodesStuff/triage-web/actions/workflows/ci.yml) runs on
+pushes and pull requests: Node from `.nvmrc`, cached npm downloads, `npm ci`, lint,
+typecheck, unit tests with the 80% line coverage gate, then build. Coverage reports
+are retained as artifacts for seven days. This job does not start an API/database
+or run Playwright.
+
+[E2E (manual)](https://github.com/SiyaCodesStuff/triage-web/actions/workflows/e2e.yml)
+runs only through **Actions → E2E (manual) → Run workflow**. Merge the workflow to
+the default branch first so GitHub offers the manual trigger. The job checks out
+`SiyaCodesStuff/triage-api` beside the frontend, starts disposable PostgreSQL 17,
+generates masked temporary JWT/admin credentials, migrates and seeds the API,
+installs Chromium with Linux dependencies, waits for API readiness, and runs
+`npm run e2e`. Playwright builds and serves the frontend automatically. The API
+process is stopped afterward; browser reports/API logs are retained for seven
+days, including on failure. Each run gets its own database and API process, so
+auth rate limits and fixture data do not carry over between runs.
+
+API checkout is pinned to verified commit
+`0b2d852959d9ac64e93576ee2b7489898e466e7f`, matching the inspected local API
+checkout. Update that pin deliberately after reviewing API changes. The API
+repository is publicly readable, so no cross-repository secret token or local
+admin password is required. JWT/admin credentials exist only for the disposable
+runner database and are never supplied as `VITE_` variables.

@@ -1,0 +1,135 @@
+name: E2E (manual)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: triage-web
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: triage
+          # Disposable runner-local test credentials, never production credentials.
+          POSTGRES_PASSWORD: triage_e2e
+          POSTGRES_DB: triage_e2e
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U triage -d triage_e2e"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      NODE_ENV: development
+      ENABLE_DOCS: 'true'
+      PORT: '3000'
+      DATABASE_URL: postgres://triage:triage_e2e@127.0.0.1:5432/triage_e2e
+      E2E_API_ORIGIN: http://127.0.0.1:3000
+    steps:
+      - name: Check out frontend
+        uses: actions/checkout@v7
+        with:
+          path: triage-web
+          persist-credentials: false
+      - name: Check out verified API revision
+        uses: actions/checkout@v7
+        with:
+          repository: SiyaCodesStuff/triage-api
+          # Public source verified against the inspected local API checkout.
+          ref: 0b2d852959d9ac64e93576ee2b7489898e466e7f
+          path: triage-api
+          persist-credentials: false
+      - name: Set up Node and npm cache
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: triage-web/.nvmrc
+          cache: npm
+          cache-dependency-path: |
+            triage-web/package-lock.json
+            triage-api/package-lock.json
+      - name: Generate disposable API and test-admin credentials
+        run: |
+          node --input-type=module <<'NODE'
+          import { randomBytes } from 'node:crypto';
+          import { appendFileSync } from 'node:fs';
+          const password = randomBytes(32).toString('hex');
+          const email = `e2e-admin-${process.env.GITHUB_RUN_ID}-${process.env.GITHUB_RUN_ATTEMPT}@example.test`;
+          const values = {
+            JWT_ACCESS_SECRET: randomBytes(32).toString('hex'),
+            JWT_REFRESH_SECRET: randomBytes(32).toString('hex'),
+            ADMIN_EMAIL: email,
+            ADMIN_PASSWORD: password,
+            E2E_ADMIN_EMAIL: email,
+            E2E_ADMIN_PASSWORD: password,
+          };
+          for (const [key, value] of Object.entries(values)) {
+            console.log(`::add-mask::${value}`);
+            appendFileSync(process.env.GITHUB_ENV, `${key}=${value}\n`);
+          }
+          NODE
+      - name: Install frontend dependencies
+        run: npm ci
+      - name: Install API dependencies
+        working-directory: triage-api
+        run: npm ci
+      - name: Install Chromium and Linux dependencies
+        run: npx playwright install --with-deps chromium
+      - name: Migrate disposable database
+        working-directory: triage-api
+        run: npm run db:migrate
+      - name: Seed test administrator
+        working-directory: triage-api
+        run: npm run db:seed
+      - name: Build API
+        working-directory: triage-api
+        run: npm run build
+      - name: Start API
+        working-directory: triage-api
+        run: |
+          node dist/server.js > "$RUNNER_TEMP/triage-api.log" 2>&1 &
+          echo "$!" > "$RUNNER_TEMP/triage-api.pid"
+      - name: Wait for API readiness and specification
+        run: |
+          api_pid=$(cat "$RUNNER_TEMP/triage-api.pid")
+          for attempt in {1..60}; do
+            if ! kill -0 "$api_pid" 2>/dev/null; then
+              echo "::error::API exited before becoming ready; see the API log artifact."
+              exit 1
+            fi
+            if curl --fail --silent --max-time 2 "$E2E_API_ORIGIN/ready" > /dev/null &&
+               curl --fail --silent --max-time 2 "$E2E_API_ORIGIN/openapi.json" > /dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "::error::API readiness timed out; see the API log artifact."
+          exit 1
+      - name: Run real API browser tests
+        run: npm run e2e
+      - name: Stop API
+        if: always()
+        working-directory: ${{ github.workspace }}
+        run: |
+          if [[ -f "$RUNNER_TEMP/triage-api.pid" ]]; then
+            kill "$(cat "$RUNNER_TEMP/triage-api.pid")" 2>/dev/null || true
+          fi
+      - name: Upload browser report and API log
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-report
+          path: |
+            triage-web/playwright-report/
+            triage-web/test-results/
+            ${{ runner.temp }}/triage-api.log
+          if-no-files-found: ignore
+          retention-days: 7
