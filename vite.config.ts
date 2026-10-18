@@ -25,12 +25,13 @@ export default defineConfig(({ mode }) => {
     server: {
       proxy: {
         [`^${apiBasePath}(?:/|$|\\?)`]: {
-          target: 'http://localhost:3000',
+          target: process.env.E2E_API_ORIGIN || 'http://localhost:3000',
           changeOrigin: true,
         },
       },
     },
     test: {
+      include: ['src/**/*.test.{ts,tsx}'],
       environment: 'jsdom',
       maxWorkers: 2,
       testTimeout: 10_000,
