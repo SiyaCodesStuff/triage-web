@@ -234,3 +234,11 @@ transforms, including development refresh scripts; no `unsafe-inline` is needed.
 If your production server sets an additional CSP header, authorize the same
 bootstrap hash there too: browsers enforce both policies. The generated
 `dist/index.html` contains the current hash; editing the script requires a rebuild.
+
+## Real API browser tests
+
+Run `npm run e2e` for the opt-in Playwright workflow against the real API and
+PostgreSQL. See [e2e/README.md](e2e/README.md) for Compose startup, database
+migration, admin seeding, browser installation, and credential setup. It uses
+unique accounts and separate browser sessions, and is not part of `npm test` or
+the default CI job.
