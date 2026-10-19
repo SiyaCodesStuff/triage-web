@@ -2,309 +2,289 @@
 
 [![CI](https://github.com/SiyaCodesStuff/triage-web/actions/workflows/ci.yml/badge.svg)](https://github.com/SiyaCodesStuff/triage-web/actions/workflows/ci.yml)
 
-React + TypeScript SPA for the Triage API. Requires Node 24 and npm.
+A support-ticket workspace for customers, agents, and administrators. Customers
+track their issues, agents move the queue forward, and administrators manage
+access—all in a responsive React app backed by the [Triage API](https://github.com/SiyaCodesStuff/triage-api).
 
-## Development
+## Screenshots
+
+Screenshots are pending. These placeholders describe the views to capture without
+linking to image files that do not exist yet.
+
+| View                | Screenshot placeholder                             |
+| ------------------- | -------------------------------------------------- |
+| Ticket queue        | Light theme, search, filters, and pagination       |
+| Ticket detail       | Dark theme, status, assignee, and comment thread   |
+| User administration | Role selection and confirmation dialog             |
+| Mobile              | Navigation and ticket content at a narrow viewport |
+
+## Features by role
+
+The API enforces permissions; hiding or disabling controls is an additional UI aid.
+
+| Role                    | Available features                                                                                                                         |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| USER                    | Register, log in, log out, create and view own tickets, search/filter/sort the ticket list, and edit title/description on own OPEN tickets |
+| AGENT                   | View the shared ticket queue, use staff assignee filters, edit ticket content, and change priority, staff assignee, and status             |
+| ADMIN                   | Staff capabilities plus confirmed ticket deletion and searchable, paginated user administration with confirmed role changes                |
+| All authenticated roles | Paginated comments on accessible tickets, add comments while a ticket is not CLOSED, and delete own comments                               |
+| ADMIN comment override  | Delete any comment on an accessible ticket, including a CLOSED ticket                                                                      |
+
+Staff status controls offer only valid next states: OPEN to IN_PROGRESS,
+IN_PROGRESS to RESOLVED, and RESOLVED to OPEN or CLOSED. CLOSED has no next state.
+Assignees must be staff. Administrators cannot demote themselves through the UI;
+the API also rejects self-demotion. Role changes take effect on the next API
+request because authorization uses the current database role.
+
+The app includes loading skeletons, empty/error states with retry, inline form
+errors, conflict feedback, toasts, a 404 page, a top-level error boundary, and
+route-level lazy loading. Routes include `/login`, `/register`, `/tickets`,
+`/tickets/new`, `/tickets/:id`, `/tickets/:id/edit`, and `/admin/users`.
+
+## Stack
+
+| Area                     | Technology                                                   |
+| ------------------------ | ------------------------------------------------------------ |
+| Runtime and build        | Node.js 24, npm, Vite                                        |
+| Application              | React 19, strict TypeScript, React Router                    |
+| Server state             | TanStack Query                                               |
+| Forms                    | React Hook Form, Zod                                         |
+| UI                       | Tailwind CSS 4, shadcn/ui, Radix UI, Lucide, Sonner          |
+| API contract             | OpenAPI, openapi-typescript, typed fetch client              |
+| Unit and component tests | Vitest, Testing Library, jsdom, MSW, vitest-axe, V8 coverage |
+| Browser tests            | Playwright with Chromium against the real API and PostgreSQL |
+| Tooling and delivery     | ESLint, Prettier, GitHub Actions, Docker, nginx              |
+
+## Architecture
+
+```mermaid
+flowchart LR
+  Browser[Browser React app] --> Nginx[nginx]
+  Nginx --> Static[Built static assets]
+  Nginx --> API[Express Triage API]
+  API --> Database[(PostgreSQL)]
+```
+
+In the production container, nginx serves the SPA and proxies `/api/v1` to the
+API, preserving the path, query, cookies, and CSRF header. Browser requests use
+one origin. For local development, Vite provides the equivalent proxy to
+`http://localhost:3000`; nginx is not required. The database is accessed by the
+API only.
+
+## Authentication and refresh
+
+1. Register or log in through `/api/v1/auth/register` or `/api/v1/auth/login`.
+   The API returns the public user in a `data` envelope and sets HttpOnly
+   `triage_access` and `triage_refresh` cookies. No token is returned for the
+   frontend to store.
+2. `AuthProvider` loads the current user through `GET /api/v1/users/me` using
+   TanStack Query. Protected routes preserve the requested destination for
+   redirect after login; unsafe external return destinations are rejected.
+3. The shared client sends `credentials: 'include'`. Every unsafe request sends
+   the API's fixed `X-CSRF-Protection: 1` marker, including login and registration.
+   This is not a secret token and does not protect against XSS.
+4. A protected request receiving 401 attempts one refresh. Concurrent requests
+   share one in-flight refresh operation per client instance. Successful refresh
+   rotates cookies and retries each original request once. Auth endpoint errors
+   do not recursively refresh.
+5. Failed refresh or another 401 clears cached auth/private data and sends a
+   protected visitor to `/login`. The optional session probe lets anonymous
+   visitors remain on public auth pages. Logout revokes the refresh session,
+   clears cookies through the API, and clears private query data.
+
+Cookies use `SameSite=Strict` and are `Secure` in production, which requires
+HTTPS. The API also supports bearer access credentials for other clients; this
+SPA uses cookies. No authentication tokens are stored in localStorage or
+sessionStorage. A saved theme preference may use localStorage.
+
+Refresh reuse detection revokes all refresh sessions for that user. Already
+issued access JWTs remain valid until expiry after logout or refresh revocation;
+current database roles still govern authorization on every protected request.
+Cross-tab refresh is not coordinated by the client's in-flight promise.
+
+API failures use an `error` envelope containing string `code` and `message`
+fields and optional `details`. The client exposes
+these as `ApiError` with `status`, `code`, `message`, and `details`. Success
+responses retain their documented `data` envelope and pagination metadata.
+See [API authentication documentation](../triage-api/docs/auth.md) and the
+running [OpenAPI specification](http://localhost:3000/openapi.json) for the contract.
+
+## Local setup
+
+Use Linux Node 24 inside WSL2, not a Windows Node/npm installation on a WSL path.
+Keep sibling checkouts at `projects/triage-web` and `projects/triage-api`.
+
+First prepare the API using its [setup instructions](../triage-api/README.md).
+It needs PostgreSQL, its backend-only environment configuration, and migrations.
+For an already configured API checkout, run in a separate terminal:
 
 ```sh
-nvm use
-npm install
+cd ~/projects/triage-api
+nvm use 24
+npm ci
+npm run db:up
+npm run db:migrate
 npm run dev
 ```
 
-Run the API separately on `http://localhost:3000`. Vite forwards `/api/v1`
-requests to it without rewriting the path, so browser requests use the Vite
-origin and development does not require CORS configuration.
+Keep this process running. Verify readiness and the spec before using the SPA:
 
-The default `VITE_API_BASE_PATH` is `/api/v1`; `.env.example` documents this
-public setting. To override it, set the variable when starting Vite or in a
-local environment file. Use an absolute path without a trailing slash.
-Never place secrets in frontend environment variables: `VITE_` values are public.
-Use relative API URLs based on this path. Cookie requests should include
-`credentials: 'include'`; unsafe API methods must send `X-CSRF-Protection: 1`
-as documented in `../triage-api/docs/auth.md`.
+```sh
+curl -f http://localhost:3000/ready
+curl -f http://localhost:3000/openapi.json
+```
 
-The API proxy is not part of the static production build. Vite preview inherits
-the proxy for local and E2E runs; production hosting must route the API path to
-the API server on the same site.
+Then start the frontend in another terminal:
 
-## Commands
+```sh
+cd ~/projects/triage-web
+nvm use
+npm ci
+npm run dev
+```
+
+Open the URL Vite prints, normally `http://localhost:5173`. Register a USER through
+the UI. An ADMIN must be seeded in the API using its documented `ADMIN_EMAIL`
+and `ADMIN_PASSWORD` settings and `npm run db:seed`; there is no built-in frontend
+admin password. API seeding does not reset an existing account's password.
+
+`VITE_API_BASE_PATH` defaults to `/api/v1`, as documented in [.env.example](.env.example).
+No frontend environment file is needed for the default. To override the public
+path, use `VITE_API_BASE_PATH=/your/api npm run dev` and ensure the API serves that
+path. Use a leading slash with no trailing slash. Never put secrets, database
+URLs, passwords, or JWT keys in the frontend or any `VITE_` variable.
+
+## Scripts
+
+| Command                 | Purpose                                                         |
+| ----------------------- | --------------------------------------------------------------- |
+| `npm run dev`           | Start Vite with the API proxy                                   |
+| `npm run build`         | Typecheck and generate `dist`                                   |
+| `npm run preview`       | Preview the built SPA locally; inherits the Vite API proxy      |
+| `npm run lint`          | Run ESLint with zero warnings allowed                           |
+| `npm run typecheck`     | Check strict TypeScript without emitting files                  |
+| `npm test`              | Run unit and component tests once                               |
+| `npm run test:coverage` | Run Vitest with V8 coverage and an 80% aggregate line threshold |
+| `npm run e2e`           | Run opt-in Playwright tests against the real API/database       |
+| `npm run api:types`     | Generate and format `src/api/schema.d.ts` from the running API  |
+| `npm run format`        | Format project files with Prettier                              |
+
+## Testing and CI
+
+Unit and component tests use MSW rather than a live API. Shared provider rendering,
+typed user factories, and baseline handlers live in `src/test`. Shell configuration
+tests use POSIX `sh` and `envsubst` from gettext, available in the Linux test setup.
 
 ```sh
 npm run typecheck
 npm run lint
 npm test
+npm run test:coverage
 npm run build
-npm run preview
-npm run format
 ```
 
-Vitest uses jsdom and Testing Library. `@/` resolves to `src/` in TypeScript,
-Vite, and tests. The application and configuration use strict TypeScript.
+On memory-constrained WSL hosts, run `npm test -- --maxWorkers=1` and
+`npm run test:coverage -- --maxWorkers=1`. Avoid running browser tests and the unit
+suite concurrently. Coverage reports include the per-file terminal table,
+`coverage/index.html`, and `coverage/coverage-summary.json`. Tests/helpers,
+generated declarations, type-only API adapters, and generated shadcn primitives
+are excluded; application files otherwise count even when unvisited.
 
-## Application shell
+Playwright covers registration/login, ticket creation and URL filters, agent
+status changes, comments, another USER receiving 404, and admin role changes with
+immediate access revocation. Follow [e2e/README.md](e2e/README.md) to start the
+Compose database, migrate a disposable test database, seed an admin, install
+Chromium, and provide Node-only test credentials. The runner builds and previews
+the frontend on port 4173; you must start the API separately. Unique emails make
+runs repeatable, but fixture users remain because the API has no user-delete
+endpoint. Auth rate limits still apply.
 
-Routes: `/login`, `/register`, `/tickets`, `/tickets/:id`, and `/admin/users`.
-The root redirects to `/tickets`; unmatched paths show a 404 page. Ticket and user-management routes are implemented. Login and registration are
-implemented, and private routes require an authenticated session.
+Default [CI](.github/workflows/ci.yml) runs `npm ci`, lint, typecheck, unit coverage,
+and build with Node from `.nvmrc` and npm caching. It does not run Playwright.
+The separate [manual E2E workflow](.github/workflows/e2e.yml) starts disposable
+PostgreSQL and the pinned API revision, migrates/seeds it, and runs Chromium.
+See the E2E guide for manual dispatch details.
 
-The responsive shell includes main navigation, a skip link, and focus management
-on route changes. The theme follows the operating system, including live changes.
-Tailwind CSS uses the Vite plugin. shadcn/ui configuration is in `components.json`;
-Button, Card, and Sonner components live in `src/components/ui`.
+## Accessibility
 
-Use `toast.success('Saved')` or `toast.error('Could not save')` from `sonner`
-for notifications. A shared toaster follows the app theme and supports dismissal.
-The top-level error boundary provides reload and return-to-tickets actions.
-Production hosting must serve `index.html` for frontend routes to support direct
-links and refreshes with BrowserRouter.
+- A skip link, semantic landmarks, labelled controls, native table captions and
+  headers, visible focus rings, and keyboard-scrollable table regions.
+- Route changes focus main content and announce the new page. Lazy-route loading,
+  async results, and toasts use polite announcements.
+- Confirmation dialogs manage/trap focus, support Escape while idle, and return
+  focus after closing. Form errors are associated with their fields.
+- Light/dark themes follow the system setting by default. A CSP-hashed bootstrap
+  applies the theme before paint; the React provider handles later changes.
+- `vitest-axe` checks key pages/dialogs, with separate contrast checks for theme
+  tokens. jsdom cannot evaluate rendered color contrast, so axe's contrast rule
+  is disabled there. These checks do not replace manual keyboard, screen-reader,
+  zoom, forced-colors, and browser contrast testing.
 
-## API client
+## Docker
 
-With the API running on port 3000, regenerate the checked-in declaration file:
+The multi-stage image builds with Node 24 and serves static output with nginx as
+UID/GID 101 on container port 8080. The measured image size is **91,008,401 bytes
+(91.0 MB or 86.8 MiB)** for the previously verified local build; architecture,
+base-image updates, and future builds can change it.
 
-```sh
-npm run api:types
-```
-
-`src/api/schema.d.ts` is generated from the running `/openapi.json`; do not edit
-it manually. Generation keeps defaulted request properties optional, matching the
-OpenAPI `required` lists. TypeScript 5.9 satisfies openapi-typescript's current
-TypeScript 5 peer requirement. Runtime JSON is typed from the schema; this client
-does not perform full runtime schema validation.
-
-Use the shared `api` instance so all requests share one refresh operation:
-
-```ts
-import { api } from '@/api/client';
-
-const profile = await api.request('get', '/users/me');
-const ticket = await api.request('get', '/tickets/{ticketId}', {
-  params: { ticketId: id },
-});
-const tickets = await api.request('get', '/tickets', {
-  query: { page: 1, pageSize: 20, status: 'OPEN' },
-});
-```
-
-Responses retain their documented envelopes, including pagination metadata.
-`ApiError` exposes `status`, `code`, `message`, and `details`. Requests include
-cookies; unsafe methods automatically send `X-CSRF-Protection: 1`.
-A protected 401 shares one refresh, then retries its original request once.
-Login and registration errors do not trigger refresh; explicit refresh calls join
-the same operation. Refresh failure or a repeated 401 clears cached session and
-private data and redirects to `/login`. Cookies remain HttpOnly; no credentials
-are stored in JavaScript or frontend environment variables.
-
-`AppProviders` mounts the shared TanStack Query client. Queries stay fresh for
-30 seconds, retain inactive data for 5 minutes, and retry network/5xx failures
-at most twice. They do not retry 4xx errors or cancellations. Mutations do not
-retry automatically. `authUserKey` in `src/auth/session.ts` holds the public user
-cached by login, registration, and refresh. API tests use MSW in Node; no service
-worker or real API is needed to run the test suite.
-
-## Authentication
-
-`AuthProvider` loads the current public user through `GET /api/v1/users/me`
-and TanStack Query. Its optional session probe can refresh an expired access
-cookie without redirecting anonymous visitors away from public auth pages.
-`useAuth()` exposes the user, loading/error state, login, registration, and logout.
-Signed-out state is cached as `null`; private data is removed on logout or expiry.
-No authentication tokens are stored in localStorage or sessionStorage.
-
-Both forms use React Hook Form and Zod, labelled inputs, pending/disabled states,
-and field-level API validation details. Registration also maps email conflicts
-to the email input. The requested frontend password minimum is 10 characters for
-both forms (maximum 128). The API itself permits 1–128 characters at login and
-requires 10–128 at registration. Name and email limits match the API.
-
-`ProtectedRoute` guards tickets; `RoleRoute` restricts `/admin/users` to ADMIN.
-The API remains responsible for enforcing authorization. Guards preserve the
-path, query, and hash in router state; expiry redirects use a local `returnTo`
-query parameter. Login and registration return to that destination, defaulting
-to `/tickets`; external destinations and auth-page loops are rejected.
-
-## Ticket list
-
-`/tickets` loads the API's paginated ticket list. Apply filters commits search,
-status, priority, staff assignee UUID, sorting, and page size to the URL and resets
-to page 1. Pagination pushes history entries; browser back/forward restores the
-controls and result query. Defaults are page 1, page size 20, created date descending.
-Invalid URL values are normalized to valid defaults; USER requests omit staff-only
-filters. Previous results remain visible while changing pages, with an updating
-message and disabled paging controls until the requested page arrives.
-
-Vitest uses at most two workers to avoid jsdom memory and CPU contention in WSL.
-
-## Ticket details and changes
-
-`/tickets/:id` displays ticket details; `/tickets/new` creates a ticket and
-`/tickets/:id/edit` edits it. USERs may edit only their own OPEN tickets, and only
-title/description. Staff can also update priority, assign an AGENT/ADMIN UUID or
-clear assignment, and choose only valid next statuses:
-OPEN → IN_PROGRESS → RESOLVED → CLOSED, plus RESOLVED → OPEN.
-Keeping the current status omits it from the PATCH. Only ADMINs see deletion,
-which requires confirmation in a keyboard-accessible dialog.
-
-Successful mutations invalidate ticket lists and the affected ticket detail;
-deleted detail data is removed. Errors appear inline and in toasts. Conflict
-errors preserve form input and offer a reload, while missing tickets show a
-friendly message with retry and a link back to tickets.
-
-## Comment threads
-
-Ticket details include comments in the API's oldest-first order, paginated with
-`page` and `limit=50`. Comments are trimmed and limited to 4,000 characters.
-CLOSED tickets disable the composer with an explanation; a server-side 409 keeps
-the draft, displays inline/toast feedback, and refreshes the ticket status.
-Authors and ADMINs can delete comments, including on closed tickets; AGENTs have
-no deletion override. Comment mutations invalidate all pages of the ticket's
-thread, and deleting a ticket also removes its cached comments.
-
-## User administration
-
-`/admin/users` requires ADMIN access. Search uses the API's `search` name/email
-filter with `page` and `limit` pagination, reflected in the URL. Selecting a new
-role opens a confirmation dialog; cancelling sends no request. Successful PATCH
-requests invalidate user lists. Your own role select is disabled with an
-explanation, and self-demotion is also guarded before submission. API errors,
-including 403 self-demotion rejections, remain visible in the dialog and a toast.
-
-## Accessibility checks
-
-The shell keeps the skip link first in keyboard order, focuses main content on
-route changes, and preserves visible focus. Search/reset/pagination actions move
-focus to a stable results heading; removing a comment returns focus to the thread.
-Confirmation dialogs trap focus, support Escape when idle, and return focus to
-the triggering control. The error boundary focuses its recovery content.
-
-Tables retain native captions and row/column headers inside labelled, keyboard-
-scrollable regions. Persistent polite, atomic live regions announce async result
-counts/pages and mutations; Sonner's existing labelled polite notification region
-is covered by tests. Required fields and field-specific error associations are
-explicit, including the closed-comment explanation.
-
-Shared theme tokens now provide stronger input borders, opaque visible focus
-outlines, and separate destructive-button foregrounds in light/dark modes.
-Tests check actual text token pairs at 4.5:1 and controls/focus at 3:1.
-`vitest-axe` scans login, registration, lists, detail/edit/create, 404, and dialogs.
-Axe's color-contrast rule is disabled in jsdom because it has no layout/paint
-engine; token checks are separate. These checks do not replace browser zoom,
-forced-colors, or screen-reader testing of rendered content.
-
-Use WSL Node 24 (`nvm use`) before installing or running checks; a Windows npm
-on a WSL path cannot reliably manage the project's Unix dependency symlinks.
-
-The audit measured the former light input border at 1.39:1 against white and the
-former dark destructive hover/white-text pair at about 3.43:1. Revised control
-borders are 4.74:1 (light card) and 7.10:1 (dark card); destructive hover text is
-5.59:1 and 5.40:1 respectively. Focus rings are 5.17:1 and 9.93:1 against cards.
-These are token/compositing calculations, not claims about untested browser output.
-
-## Shared test utilities and coverage
-
-`src/test/render.tsx` exports `renderWithProviders(ui, { path })`, using the real
-query, theme, router, and auth providers. `renderAuthApp` builds on this helper.
-The app's auth client updates a singleton query cache, so clear `queryClient` in
-both `beforeEach` and `afterEach` to isolate tests.
-
-`createUser(overrides)` in `src/test/fixtures.ts` returns independent users with
-unique UUIDs/emails and typed overrides. `createHandlers({ currentUser })` in
-`src/test/handlers.ts` provides baseline session, empty-list, and fixture-ticket
-responses. Pass `currentUser: null` for guests. Register these with
-`server.use(...createHandlers(...))`; override individual scenarios with later
-`server.use()` calls. Keep `server.listen`, `resetHandlers`, and `close` in the
-test lifecycle, with unhandled requests treated as errors.
-
-Run `npm run test:coverage` for V8 coverage. The aggregate line threshold is 80%;
-falling below it fails the command. All application TypeScript files are included,
-including unvisited files and `src/main.tsx`. Exclusions are tests/helpers,
-generated declarations, the type-only API adapters (`src/api/types.ts`), and
-generated shadcn primitives (`src/components/ui`). Reports include the console table,
-`coverage/index.html`, and `coverage/coverage-summary.json`. Coverage artifacts are
-already ignored.
-
-## Theme initialization and script CSP
-
-The blocking `theme-bootstrap` script in the HTML head applies the saved or system
-light/dark theme before the app is parsed. It falls back to the system setting if
-storage is unavailable. A script-free React provider maintains live system/theme
-and storage changes after mounting.
-
-`build/script-csp.ts` adds a `script-src` CSP meta policy with same-origin sources
-and SHA-256 hashes of the exact inline script contents. It runs after Vite's HTML
-transforms, including development refresh scripts; no `unsafe-inline` is needed.
-If your production server sets an additional CSP header, authorize the same
-bootstrap hash there too: browsers enforce both policies. The generated
-`dist/index.html` contains the current hash; editing the script requires a rebuild.
-
-## Real API browser tests
-
-Run `npm run e2e` for the opt-in Playwright workflow against the real API and
-PostgreSQL. See [e2e/README.md](e2e/README.md) for Compose startup, database
-migration, admin seeding, browser installation, and credential setup. It uses
-unique accounts and separate browser sessions, and is not part of `npm test` or
-the default CI job.
-
-## GitHub Actions
-
-[CI](https://github.com/SiyaCodesStuff/triage-web/actions/workflows/ci.yml) runs on
-pushes and pull requests: Node from `.nvmrc`, cached npm downloads, `npm ci`, lint,
-typecheck, unit tests with the 80% line coverage gate, then build. Coverage reports
-are retained as artifacts for seven days. This job does not start an API/database
-or run Playwright.
-
-[E2E (manual)](https://github.com/SiyaCodesStuff/triage-web/actions/workflows/e2e.yml)
-runs only through **Actions → E2E (manual) → Run workflow**. Merge the workflow to
-the default branch first so GitHub offers the manual trigger. The job checks out
-`SiyaCodesStuff/triage-api` beside the frontend, starts disposable PostgreSQL 17,
-generates masked temporary JWT/admin credentials, migrates and seeds the API,
-installs Chromium with Linux dependencies, waits for API readiness, and runs
-`npm run e2e`. Playwright builds and serves the frontend automatically. The API
-process is stopped afterward; browser reports/API logs are retained for seven
-days, including on failure. Each run gets its own database and API process, so
-auth rate limits and fixture data do not carry over between runs.
-
-API checkout is pinned to verified commit
-`0b2d852959d9ac64e93576ee2b7489898e466e7f`, matching the inspected local API
-checkout. Update that pin deliberately after reviewing API changes. The API
-repository is publicly readable, so no cross-repository secret token or local
-admin password is required. JWT/admin credentials exist only for the disposable
-runner database and are never supplied as `VITE_` variables.
-
-### Production container
-
-The multi-stage Dockerfile builds with Node 24 and serves only the resulting static files
-using unprivileged nginx (UID/GID 101, port 8080). No application secrets belong in
-build arguments. `.dockerignore` excludes every `.env*` file, including examples.
-
-From `triage-web`, build and run:
+For an API running directly in WSL, keep the API running, then use:
 
 ```sh
 docker build -t triage-web:local .
-docker run --rm -p 8080:8080 --read-only --tmpfs /tmp:rw,noexec,nosuid,size=64m \
-  -e API_UPSTREAM=http://triage-api:3000 --network triage triage-web:local
-docker image inspect triage-web:local --format '{{.Size}}'
+docker run --rm --name triage-web-local -p 8080:8080 --read-only \
+  --tmpfs /tmp:rw,noexec,nosuid,size=64m \
+  --add-host host.docker.internal:host-gateway \
+  -e API_UPSTREAM=http://host.docker.internal:3000 triage-web:local
 ```
 
-Attach the frontend and API containers to the same Docker network (named `triage`
-in this example). `API_UPSTREAM` is required and must be an HTTP(S) origin without
-a path, credentials, query, or trailing slash. It is rendered at startup, with DNS
-resolved when nginx starts; restart the frontend if the backend address changes.
-HTTPS upstream certificates are verified using the image's CA bundle.
-For an API running directly in WSL rather than a container, replace the network
-option with `--add-host host.docker.internal:host-gateway` and use
-`API_UPSTREAM=http://host.docker.internal:3000`. The API must listen on an
-interface reachable from Docker; container `localhost` refers to nginx itself.
+Open `http://localhost:8080`. The API must listen on an interface reachable from
+Docker. For an API container, attach both containers to the same existing network
+and set `API_UPSTREAM` to its service origin, such as `http://triage-api:3000`.
+Do not use container `localhost` for an API outside that container, or assume the
+Docker bridge gateway is the address of a WSL-hosted API.
 
-The default API path is `/api/v1`. To change it, build with
-`--build-arg VITE_API_BASE_PATH=/your/api`; the same path is baked into nginx so
-browser requests and proxy routing agree. Requests preserve their path, query,
-cookies, and CSRF header. API responses and HTML use `no-store`; successful
-fingerprinted assets use a one-year immutable cache. Missing assets return 404,
-while application routes fall back to `index.html`.
+`API_UPSTREAM` is required at startup and accepts only an HTTP(S) origin without
+credentials, path, query, or trailing slash. DNS is resolved when nginx starts;
+restart the frontend after an upstream address change. HTTPS upstream certificates
+are verified. To change the public API path, build with
+`--build-arg VITE_API_BASE_PATH=/your/api`; the frontend and nginx receive the
+same baked path. `API_UPSTREAM` changes the backend address, not that path.
 
-Terminate public HTTPS at your ingress/reverse proxy and configure HSTS there.
-The nginx security policy supplements the generated HTML script hash policy,
-allowing the existing theme bootstrap to execute before paint. The container
-writes configuration, PID, and temporary files only under `/tmp`.
+nginx provides SPA fallback, a one-year immutable cache for successful hashed
+assets, `no-store` for HTML/API responses, and security headers compatible with
+the generated script CSP. Missing `/assets/` files return 404. Configuration,
+PID, and temporary files use `/tmp`, allowing a read-only root filesystem.
+`.dockerignore` excludes `.env*` files, dependencies, and local build/test artifacts.
+Terminate production HTTPS and configure HSTS at the ingress.
+
+Useful checks and recovery commands:
+
+```sh
+docker image inspect triage-web:local --format '{{.Size}}'
+docker logs --tail 50 triage-web-local
+docker stop triage-web-local
+```
+
+A 502 means the proxy did not obtain a usable API response: check the container
+log and API readiness first. An occupied host port can be avoided with
+`-p 8081:8080`, opening `http://localhost:8081`. To free a port, identify its
+container with `docker ps --filter publish=8080`, then stop only that container.
+
+## Decisions and trade-offs
+
+| Decision                                                  | Benefit                                                                        | Trade-off                                                                                                                         |
+| --------------------------------------------------------- | ------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------- |
+| HttpOnly cookies instead of token storage in localStorage | Browser scripts cannot read the auth cookies; the API owns rotation and logout | Requires cookie-aware same-site hosting, HTTPS in production, and CSRF protection; XSS can still issue authenticated requests     |
+| URL-synced search, filters, sort, and pagination          | Shareable views, reload persistence, and working browser back/forward          | URL parsing and normalization add complexity; URLs expose filter/search terms in history and copied links                         |
+| Generated OpenAPI types                                   | Client paths and request/response types track the API contract                 | Requires a running API and regeneration after contract changes; types do not validate JSON at runtime                             |
+| TanStack Query cache                                      | Shared server state, mutation invalidation, previous results while paging      | Cached state needs deliberate invalidation and clearing on auth changes; 4xx requests and mutations are not automatically retried |
+| Route-level lazy loading                                  | Smaller initial bundle with separate page chunks                               | First navigation to a page needs its chunk; Suspense and focus/announcement handling remain necessary                             |
+| One in-flight refresh per client                          | Concurrent requests within a tab do not race cookie rotation                   | Separate tabs still need consideration because refresh reuse detection is enforced by the API                                     |
+
+Run `npm run api:types` in **triage-web**, with the API on port 3000, after changing
+its contract. Review and commit the generated declaration file; do not hand-edit
+it. Keep backend secrets and database configuration in the API project.
+
+## License
+
+See [LICENSE](LICENSE).
