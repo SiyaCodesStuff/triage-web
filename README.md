@@ -271,3 +271,40 @@ checkout. Update that pin deliberately after reviewing API changes. The API
 repository is publicly readable, so no cross-repository secret token or local
 admin password is required. JWT/admin credentials exist only for the disposable
 runner database and are never supplied as `VITE_` variables.
+
+### Production container
+
+The multi-stage Dockerfile builds with Node 24 and serves only the resulting static files
+using unprivileged nginx (UID/GID 101, port 8080). No application secrets belong in
+build arguments. `.dockerignore` excludes every `.env*` file, including examples.
+
+From `triage-web`, build and run:
+
+```sh
+docker build -t triage-web:local .
+docker run --rm -p 8080:8080 --read-only --tmpfs /tmp:rw,noexec,nosuid,size=64m \
+  -e API_UPSTREAM=http://triage-api:3000 --network triage triage-web:local
+docker image inspect triage-web:local --format '{{.Size}}'
+```
+
+Attach the frontend and API containers to the same Docker network (named `triage`
+in this example). `API_UPSTREAM` is required and must be an HTTP(S) origin without
+a path, credentials, query, or trailing slash. It is rendered at startup, with DNS
+resolved when nginx starts; restart the frontend if the backend address changes.
+HTTPS upstream certificates are verified using the image's CA bundle.
+For an API running directly in WSL rather than a container, replace the network
+option with `--add-host host.docker.internal:host-gateway` and use
+`API_UPSTREAM=http://host.docker.internal:3000`. The API must listen on an
+interface reachable from Docker; container `localhost` refers to nginx itself.
+
+The default API path is `/api/v1`. To change it, build with
+`--build-arg VITE_API_BASE_PATH=/your/api`; the same path is baked into nginx so
+browser requests and proxy routing agree. Requests preserve their path, query,
+cookies, and CSRF header. API responses and HTML use `no-store`; successful
+fingerprinted assets use a one-year immutable cache. Missing assets return 404,
+while application routes fall back to `index.html`.
+
+Terminate public HTTPS at your ingress/reverse proxy and configure HSTS there.
+The nginx security policy supplements the generated HTML script hash policy,
+allowing the existing theme bootstrap to execute before paint. The container
+writes configuration, PID, and temporary files only under `/tmp`.
