@@ -222,6 +222,38 @@ See the E2E guide for manual dispatch details.
 
 ## Docker
 
+### Pull a published image
+
+The [publish workflow](.github/workflows/publish-image.yml) runs on pushed `v*`
+tags and requires a stable release tag in `vMAJOR.MINOR.PATCH` format. For example,
+`v1.2.3` builds the root Dockerfile and pushes `1.2.3`, `1.2`, and `latest` to
+`ghcr.io/<owner>/<repo>`, with the owner and repository lowercased. The latter
+two tags move to the most recently published release, including when publishing
+an older release line. Prerelease and malformed tags fail before publishing.
+
+After a successful publish, pull the desired tag (replace `1.2.3` with a published
+version; adjust the owner/repository for a fork):
+
+```sh
+docker pull ghcr.io/siyacodesstuff/triage-web:1.2.3
+# Alternatively, track a release line or the most recently published release:
+docker pull ghcr.io/siyacodesstuff/triage-web:1.2
+docker pull ghcr.io/siyacodesstuff/triage-web:latest
+```
+
+Anonymous pulls require the GHCR package visibility to be public. For a private
+package, authenticate locally with an account authorized to read that package.
+Publishing uses only the built-in `GITHUB_TOKEN`, with `contents: read` and
+`packages: write`; no additional repository secrets are needed. The workflow
+uses pinned action commits, GitHub Actions layer caching, and OCI source,
+version, and MIT licence labels.
+
+Published images use the default baked API path `/api/v1`. Set `API_UPSTREAM`
+at startup as described below; the container listens on port 8080. A custom
+public API path requires building your own image with `VITE_API_BASE_PATH`.
+
+### Build and run locally
+
 The multi-stage image builds with Node 24 and serves static output with nginx as
 UID/GID 101 on container port 8080. The measured image size is **91,008,401 bytes
 (91.0 MB or 86.8 MiB)** for the previously verified local build; architecture,
